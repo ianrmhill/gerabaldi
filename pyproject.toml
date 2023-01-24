@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=66.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["gerabaldi"]
+
+[project]
+name = "gerabaldi"
+dynamic = ["version", "dependencies"]
+authors = [
+  { name="Ian Hill", email="ianrmhill@gmail.com" },
+]
+description = "A temporal simulator for probabilistic degradation and failure processes with a focus on integrated circuit wear-out "
+readme = "README.md"
+requires-python = ">=3.10"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+    "Topic :: Scientific/Engineering :: Physics",
+    "Intended Audience :: Science/Research",
+    "Development Status :: 3 - Alpha",
+]
+
+[tool.setuptools.dynamic]
+version = {attr = "gerabaldi.__version__"}
+dependencies = {file = ["requirements.txt"]}
+
+[project.urls]
+"Homepage" = "https://github.com/ianrmhill/gerabaldi"

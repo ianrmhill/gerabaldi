@@ -1,0 +1,9 @@
+.pytest_cache/
+.idea/
+
+# Packaging
+dist/
+*.egg-info/
+
+# Data files
+*.nc
