@@ -1,5 +1,6 @@
 """Tests to ensure the degradation simulator module works according to the intended simulation flow and feature set."""
 
+import pytest
 from datetime import timedelta
 import numpy as np
 import pandas as pd
@@ -141,12 +142,12 @@ def test_vts_paper_example_1():
     full_meas = MeasSpec({'amp_gain': num_devices}, {'temp': 30 + CELSIUS_TO_KELVIN, 'vdd': 0.86}, 'All')
     # First is an HTOL test
     htol_stress = StrsSpec({'temp': 125 + CELSIUS_TO_KELVIN, 'vdd': 0.92}, 50, 'HTOL Stress')
-    htol_test = TestSpec([], num_chips, num_lots, name='HTOL Similar Test')
-    htol_test.add_looped_steps(full_meas, htol_stress, duration=1000)
+    htol_test = TestSpec([full_meas], num_chips, num_lots, name='HTOL Similar Test')
+    htol_test.append_steps([htol_stress, full_meas], 1000)
     # Next is an LTOL test
     ltol_stress = StrsSpec({'temp': -10 + CELSIUS_TO_KELVIN, 'vdd': 0.92}, 50, 'Low Temperature Stress')
-    ltol_test = TestSpec([], num_chips, num_lots, name='LTOL Similar Test')
-    ltol_test.add_looped_steps(full_meas, ltol_stress, duration=1000)
+    ltol_test = TestSpec([full_meas], num_chips, num_lots, name='LTOL Similar Test')
+    ltol_test.append_steps([ltol_stress, full_meas], 1000)
     # Third is a more complex test to showcase the rich test support of the simulator
     ramp_cycle_relax_interval = StrsSpec({'temp': 30 + CELSIUS_TO_KELVIN, 'vdd': 0.86}, 10, 'Ramp Cycle Relax')
     ramp_cycle_stress_1 = StrsSpec({'temp': 100 + CELSIUS_TO_KELVIN, 'vdd': 0.88}, 90, 'Ramp Cycle Stress 1')
@@ -236,9 +237,9 @@ def test_vts_paper_example_1():
     results[test_list[1]] = gerabaldi.simulate(htol_test, dev_mdl, test_env)
     results[test_list[2]] = gerabaldi.simulate(ltol_test, dev_mdl, test_env)
     # Now simulate for the upcoming process, need to adjust the initial value lot variability and 'alpha' in each model
-    dev_mdl.v_th_mdl.init_mdl._latent_init_val.lot_vrtn_mdl = Normal(0, 0.0006, test_seed=787)
-    dev_mdl.v_th_mdl.bti_mdl._latent_alpha.chp_vrtn_mdl = Normal(1, 0.01, test_seed=777)
-    dev_mdl.v_th_mdl.hci_mdl._latent_alpha.chp_vrtn_mdl = Normal(1, 0.08, test_seed=767)
+    dev_mdl.prm_mdl('v_th').init_mdl.latent_var('init_val').lot_vrtn_mdl = Normal(0, 0.0006, test_seed=787)
+    dev_mdl.prm_mdl('v_th').mech_mdl('bti').latent_var('alpha').chp_vrtn_mdl = Normal(1, 0.01, test_seed=777)
+    dev_mdl.prm_mdl('v_th').mech_mdl('hci').latent_var('alpha').chp_vrtn_mdl = Normal(1, 0.08, test_seed=767)
     results[test_list[3]] = gerabaldi.simulate(ramp_failure_test, dev_mdl, test_env)
     results[test_list[4]] = gerabaldi.simulate(htol_test, dev_mdl, test_env)
     results[test_list[5]] = gerabaldi.simulate(ltol_test, dev_mdl, test_env)
@@ -299,11 +300,10 @@ def test_vts_paper_example_2():
     weekly_idle_use = StrsSpec({'temp': 30 + CELSIUS_TO_KELVIN, 'v_g': 0.87}, 122, 'Idle State')
     check_fail_states = MeasSpec({'tddb': num_samples}, {'temp': 35 + CELSIUS_TO_KELVIN, 'v_g': 0.9})
 
-    field_use_sim = TestSpec([], name='Field Use Sim', description='Test spec designed to represent a real-world \
+    field_use_sim = TestSpec([check_fail_states], name='Field Use Sim', description='Test spec designed to represent a real-world \
         use scenario for a consumer device with downtime and higher stress periods.')
-    field_use_sim.add_looped_steps(meas=check_fail_states,
-                                   strs=[weekly_moderate_use, weekly_intensive_use, weekly_idle_use],
-                                   duration=test_len)
+    with pytest.raises(UserWarning):
+        field_use_sim.append_steps([weekly_moderate_use, weekly_intensive_use, weekly_idle_use, check_fail_states], test_len)
 
     #### 2. Define the test/field environment ###
     field_env = PhysTestEnv(env_vrtns={

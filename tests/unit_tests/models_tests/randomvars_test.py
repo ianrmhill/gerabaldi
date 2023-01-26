@@ -2,9 +2,11 @@
 
 import pytest
 import numpy as np
-import pymc
 
 from gerabaldi.models.randomvars import *
+from gerabaldi.helpers import _on_demand_import
+
+pymc = _on_demand_import('pymc')
 
 
 def test_deterministic_dist():

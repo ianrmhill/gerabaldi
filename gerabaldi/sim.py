@@ -59,7 +59,7 @@ def _sim_stress_step(step: StrsSpec, prior_state: TestSimState, sim_model: Devic
     # 1. Build the stochastically-adjusted set of stress conditions
     cond_vals = {}
     for prm in sim_model.prm_mdl_list:
-        if type(getattr(sim_model, prm + '_mdl')) == DegradedParamModel:
+        if type(sim_model.prm_mdl(prm)) == DegradedParamModel:
             # The number of samples to stress is inherited from the size of the prior degradation dataframe
             cond_vals[prm], _ = test_env.gen_env_cond_vals(step.conditions, prior_state.curr_prm_vals[prm].shape)
 
@@ -98,7 +98,7 @@ def _sim_meas_step(step: MeasSpec, deg_data: TestSimState, sim_model: DeviceMode
     env_conds = {}
     num_sensors = {prm: step.measurements[prm] for prm in step.measurements if prm in step.conditions.keys()}
     for prm in sim_model.prm_mdl_list:
-        if type(getattr(sim_model, prm + '_mdl')) == DegradedParamModel:
+        if type(sim_model.prm_mdl(prm)) == DegradedParamModel:
             env_conds[prm], sensor_conds =\
                 test_env.gen_env_cond_vals(step.conditions, deg_data.curr_prm_vals[prm].shape, num_sensors)
         else:
@@ -111,7 +111,7 @@ def _sim_meas_step(step: MeasSpec, deg_data: TestSimState, sim_model: DeviceMode
         # There are three types of parameters: environmental conditions, degraded parameters and derived parameters
         if prm in deg_data.curr_prm_vals:
             # Adjust the param values based on environmental conditions during measurement and the instrument used
-            measured = getattr(sim_model, prm + '_mdl').calc_cond_shifted_vals(step.measurements[prm], env_conds[prm],
+            measured = sim_model.prm_mdl(prm).calc_cond_shifted_vals(step.measurements[prm], env_conds[prm],
                                                                                deg_data.curr_prm_vals[prm],
                                                                                deg_data.latent_var_vals[prm])
             measured = TestSimReport.format_measurements(measured, prm, deg_data.elapsed, 'parameter')
@@ -122,7 +122,7 @@ def _sim_meas_step(step: MeasSpec, deg_data: TestSimState, sim_model: DeviceMode
 
         elif prm in sim_model.prm_mdl_list:
             # Derived parameter values that can depend on multiple degraded parameters, i.e. circuit models
-            measured = getattr(sim_model, prm + '_mdl').calc_circ_vals(step.measurements[prm], env_conds[prm],
+            measured = sim_model.prm_mdl(prm).calc_circ_vals(step.measurements[prm], env_conds[prm],
                                                                        deg_data.curr_prm_vals,
                                                                        deg_data.latent_var_vals[prm])
             measured = TestSimReport.format_measurements(measured, prm, deg_data.elapsed, 'parameter')

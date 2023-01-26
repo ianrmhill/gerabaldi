@@ -4,7 +4,11 @@ Classes for defining wear-out tests in terms of conditions, durations, execution
 
 from datetime import timedelta
 
+from gerabaldi.exceptions import UserConfigError
+
 __all__ = ['MeasSpec', 'StrsSpec', 'TestSpec']
+
+SECONDS_PER_HOUR = 3600
 
 
 class MeasSpec:
@@ -18,11 +22,14 @@ class MeasSpec:
 
 class StrsSpec:
     """Defines a set of test conditions to simulate wear-out under for some duration."""
-    def __init__(self, conditions: dict, duration: timedelta | int, name: str = 'unspecified'):
+    def __init__(self, conditions: dict, duration: timedelta | int | float, name: str = 'unspecified'):
         self.conditions = conditions
         # Currently, test lengths use units of hours, but are provided as timedelta objects
         if type(duration) == int:
             duration = timedelta(hours=duration)
+        # Ensure the duration of the stress phase/cell is not 0
+        if duration == timedelta():
+            raise UserConfigError(f"Stress Specification '{name}' cannot have a time duration of 0.")
         self.duration = duration
         self.name = name
 
@@ -46,31 +53,49 @@ class TestSpec:
         self.description = description
         self.name = name
 
-    def add_steps(self, steps: MeasSpec | StrsSpec | list):
+    def append_steps(self, steps: MeasSpec | StrsSpec | list, loop_for_duration: timedelta | int | float = None):
         """Append one or more test instruction steps to the end of the existing list of test steps."""
-        if type(steps) is list:
-            self.steps.extend(steps)
-        else:
-            self.steps.append(steps)
-
-    def add_looped_steps(self, meas: MeasSpec | list, strs: StrsSpec | list,
-                         duration: timedelta | int | float, fresh_meas: bool = True):
-        """Convert and append a repeated stress-measure specification as the appropriate series of sequential steps."""
-        if type(duration) != timedelta:
-            duration = timedelta(hours=duration)
-        # Loop, adding stress and measurement steps until the stress duration sums to greater than the total requested
-        t = timedelta()
-        while t < duration:
-            # Add a measurement prior to any stress only if a fresh measurement is requested
-            if t == timedelta() and fresh_meas:
-                self.add_steps(meas)
-            self.add_steps(strs)
-            if type(strs) == list:
-                for phase in strs:
-                    t += phase.duration
+        # If not looping, simply add the steps onto the test list
+        if loop_for_duration is None:
+            if type(steps) is list:
+                self.steps.extend(steps)
             else:
-                t += strs.duration
-            self.add_steps(meas)
+                self.steps.append(steps)
+        else:
+            # If we are looping the steps until some amount of elapsed time, we first convert the time for comparison
+            if type(loop_for_duration) != timedelta:
+                duration = timedelta(hours=loop_for_duration)
+            else:
+                duration = loop_for_duration
+            # Loop, appending the set of steps until the stress duration sums to greater than the total requested
+            t = timedelta()
+
+            # Ensure duration is not 0
+            if duration == t:
+                raise UserConfigError('Cannot loop test steps for a time duration of 0.')
+            # Ensure steps to add are not purely measurement steps, as that would result in infinite steps being added
+            if type(steps) is MeasSpec or (type(steps) is list and all(isinstance(step, MeasSpec) for step in steps)):
+                raise UserConfigError(f"Cannot add steps to test in a loop if no stress phase present, infinite"
+                                      f"test steps will result")
+
+            while t < duration:
+                # Add a set of steps
+                if type(steps) is list:
+                    self.steps.extend(steps)
+                else:
+                    self.steps.append(steps)
+                # Count the total time required for one loop of the steps
+                if type(steps) is list:
+                    for step in steps:
+                        if type(step) == StrsSpec:
+                            t += step.duration
+                else:
+                    t += steps.duration
+
+            # Check if the duration was an integer multiple of the duration of the set of steps, warn if not
+            if not (t / duration).is_integer():
+                raise UserWarning(f"Appended steps did not result in an integer multiple of the duration, test "
+                                  f"may be longer than intended.")
 
     def calc_samples_needed(self):
         """

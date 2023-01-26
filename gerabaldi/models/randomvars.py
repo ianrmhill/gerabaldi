@@ -1,12 +1,15 @@
 """Custom generators for random variables used for experiment simulation and model specification. Necessary as the Numpy
 and PyMC RVs are either not storable or futz about with tensor variables."""
 
-import pymc
-import pyro
-import pyro.distributions as dist
 import numpy as np
 
 from gerabaldi.exceptions import MissingParamError
+from gerabaldi.helpers import _on_demand_import
+
+# Optional imports are loaded using a helper function that suppresses import errors until attempted use
+pymc = _on_demand_import('pymc')
+pyro = _on_demand_import('pyro', 'pyro-ppl')
+dist = _on_demand_import('pyro.distributions', 'pyro-ppl')
 
 __all__ = ['RandomVar', 'Deterministic', 'Normal', 'Gamma', 'Uniform']
 

@@ -1,8 +1,10 @@
 """Tests that ensure the effective description and execution of test specifications are correctly implemented."""
 
+import pytest
 from datetime import timedelta
 
 from gerabaldi.models import MeasSpec, StrsSpec, TestSpec
+from gerabaldi.exceptions import UserConfigError
 
 
 def test_meas_spec():
@@ -24,6 +26,9 @@ def test_strs_spec():
     # Test argument type adjustments
     spec = StrsSpec({'temp': 100}, duration=40)
     assert spec.duration == timedelta(hours=40)
+    # Test 0 duration error handling
+    with pytest.raises(UserConfigError):
+        spec = StrsSpec({'temp': 50}, duration=0)
 
 
 def test_test_spec():
@@ -35,13 +40,24 @@ def test_test_spec():
     assert test.name == 'unspecified'
     assert (test.num_lots, test.num_chps) == (1, 1)
     assert len(test.steps) == 0
-    test.add_looped_steps(meas, stress, 300)
-    assert len(test.steps) == 7
+    test.append_steps([meas, stress], 300)
+    assert len(test.steps) == 6
+
+    # Test error handling for bad input combinations for appending steps in a loop
+    with pytest.raises(UserConfigError):
+        test.append_steps(stress, 0)
+    with pytest.raises(UserConfigError):
+        test.append_steps(meas, 10)
+    with pytest.raises(UserConfigError):
+        test.append_steps([meas, meas, meas], 10)
+    with pytest.raises(UserWarning):
+        test.append_steps([stress, meas], 310)
+    assert len(test.steps) == 14
 
     # Now add non-default values
     meas2 = MeasSpec({'delay': 15, 'current': 2}, {'temp': 100}, 'GenericMeas2')
     test = TestSpec([meas, stress, meas], 2, 3, 'This test has non-default arguments', 'Good Fun')
-    test.add_steps(meas2)
+    test.append_steps(meas2)
     assert (test.num_chps, test.num_lots) == (2, 3)
     assert test.description == 'This test has non-default arguments'
     assert test.name == 'Good Fun'

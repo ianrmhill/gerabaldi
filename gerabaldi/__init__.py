@@ -22,7 +22,7 @@ None yet
 """
 
 # This determines the project version for PyPi as well
-__version__ = '0.0.10'
+__version__ = '0.0.11'
 
 from . import models
 from . import cookbook
