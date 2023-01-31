@@ -7,6 +7,8 @@ import pandas as pd
 import numpy as np
 from datetime import timedelta
 
+from gerabaldi.models.devices import DeviceModel
+from gerabaldi.models.testspecs import TestSpec
 from gerabaldi.exceptions import ArgOverwriteWarning
 
 __all__ = ['TestSimReport']
@@ -22,14 +24,16 @@ class TestSimReport:
     """
     Class for structuring the results of simulated tests for reporting, including test info, measurements, and so on.
     """
-    def __init__(self, name: str = 'generic', description: str = ""):
-        self.test_name = name
-        self.test_description = description
+    def __init__(self, test_def: TestSpec, name: str = None, description: str = None):
+        self.test_name = name if name else test_def.name
+        self.test_description = description if description else test_def.description
+        self.num_chps, self.num_lots = test_def.num_chps, test_def.num_lots
+        self.dev_counts = test_def.calc_samples_needed()
         self.measurements = pd.DataFrame()
         self.stress_summary = pd.DataFrame()
 
     @staticmethod
-    def format_measurements(measured_vals: list | pd.Series, prm_name: str, meas_time: timedelta,
+    def format_measurements(measured_vals: list | pd.Series | np.ndarray, prm_name: str, meas_time: timedelta,
                             prm_type: str = 'parameter'):
         """
         Take a set of measured values of a parameter and condition and create a formatted dataframe to report the
@@ -43,6 +47,9 @@ class TestSimReport:
             circ_num = np.tile(np.linspace(0, num_meas - 1, num_meas, dtype=int), num_devs * num_lots)
             dev_num = np.tile(np.repeat(np.linspace(0, num_devs - 1, num_devs, dtype=int), num_meas), num_lots)
             lot_num = np.repeat(np.linspace(0, num_lots - 1, num_lots, dtype=int), num_meas * num_devs)
+        elif prm_type == 'condition':
+            num_lots, num_devs, num_meas = measured_vals.shape
+            measured_vals = measured_vals.reshape(num_meas * num_devs * num_lots)
         formatted = pd.DataFrame({'param': prm_name,
                                   'device #': circ_num,
                                   'chip #': dev_num,

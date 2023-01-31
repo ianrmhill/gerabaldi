@@ -1,10 +1,11 @@
 """Tests for the classes that provide the effects of the physical test environment and measuring devices used."""
 
+import pytest
 import numpy as np
 import pandas as pd
 
-from gerabaldi.models.physenvs import *
-from gerabaldi.models.randomvars import *
+from gerabaldi.models import *
+from gerabaldi.exceptions import UserConfigError
 
 
 def test_measurement_device():
@@ -26,42 +27,99 @@ def test_measurement_device():
     assert dev.measure(np.inf) == 1000
 
 
-def test_physical_test_environment():
+def test_env_vrtn_model(sequential_var):
+    # First test default model setup
+    mdl = EnvVrtnMdl()
+    assert mdl.name is None
+    assert mdl.vrtn_type == 'offset'
+    assert mdl.batch_vrtn_mdl.sample() == 0
+    assert np.allclose(mdl.gen_env_vrtns(15, 2, 2), np.array([[[15, 15], [15, 15]]]))
+
+    # Now test all the attribute setting logic
+    mdl.name = 'new_name'
+    assert mdl.name == 'new_name'
+    mdl.vrtn_type = 'scaling'
+    assert mdl.vrtn_type == 'scaling'
+    assert mdl.batch_vrtn_mdl.sample() == 1
+    assert np.allclose(mdl.gen_env_vrtns(15, 2, 2), np.array([[[15, 15], [15, 15]]]))
+    mdl.chp_vrtn_mdl = Normal(0, 0.5, test_seed=675)
+    mdl.vrtn_type = 'offset'
+    assert mdl.batch_vrtn_mdl.sample() == 0
+    assert np.round(mdl.chp_vrtn_mdl.sample(), 2) == -0.31
+    assert np.allclose(np.round(mdl.gen_env_vrtns(15, 2, 2), 2), np.array([[[14.34, 14.34], [14.72, 14.72]]]))
+    mdl.chp_vrtn_mdl = None
+    assert mdl.chp_vrtn_mdl.sample() == 0 # noqa
+    with pytest.raises(AttributeError):
+        mdl.new_attribute = 'some_val' # noqa
+
+    # Test all the variation value generation methods
+    mdl = EnvVrtnMdl(dev_vrtn_mdl=sequential_var(0, 0.01), chp_vrtn_mdl=sequential_var(0, 0.1),
+                     batch_vrtn_mdl=sequential_var(1, 1))
+    mdl.vrtn_type = 'scaling'
+    mdl.dev_vrtn_mdl = Deterministic(3)
+    mdl.chp_vrtn_mdl = Deterministic(2)
+    assert mdl.vrtn_type == 'scaling'
+    assert mdl.gen_env_vrtns(3)[0][0][0] == 18
+    assert mdl.gen_env_vrtns(3, 3, 2, 3)[0][0][0] == 18
+    mdl.vrtn_type = 'offset'
+    mdl.dev_vrtn_mdl = sequential_var(1, 1)
+    mdl.chp_vrtn_mdl = sequential_var(1, 1)
+    assert mdl.gen_batch_vrtn(3) == 4
+    assert mdl.gen_chp_vrtns(3) == 4
+    assert np.allclose(mdl.gen_chp_vrtns(-1, 2, 3), np.array([[0, 1], [2, 3], [4, 5]]))
+    assert mdl.gen_dev_vrtns(3) == 4
+    assert np.allclose(mdl.gen_dev_vrtns(np.array([[-1, -2]]), 3), np.array([[[0, 1, 2], [2, 3, 4]]]))
+    assert mdl.gen_env_vrtns(-3, 2, 2, 2)[1][0][1] == 7
+
+
+def test_physical_test_environment(sequential_var):
     # Test default creation first
     env = PhysTestEnv()
     assert env.name == 'unspecified'
-    assert type(env.get_vrtn_mdl('some_prm')) == EnvVrtnMdl
-    assert type(env.get_meas_instm('another_prm')) == MeasInstrument
-    assert env.gen_env_cond_vals({'p1': 125, 'prm2': 3.1415})[0] == {'p1': np.array(125), 'prm2': np.array(3.1415)}
-    assert np.allclose(env.gen_env_cond_vals({'p1': 125}, num_vals=(1, 2, 2))[0]['p1'],
+    assert type(env.vrtn_mdl('some_prm')) == EnvVrtnMdl
+    assert type(env.meas_instm('another_prm')) == MeasInstrument
+    assert env.gen_env_cond_vals({'p1': 125, 'prm2': 3.1415}, {'p1': 1, 'prm2': 1})['prm2']['prm2'] == 3.1415
+    assert np.allclose(env.gen_env_cond_vals({'p1': 125}, {'p1': 2}, num_chps=2)['p1']['p1'],
                        np.array([[[125, 125], [125, 125]]]))
-    # Now test non-defaults
-    env = PhysTestEnv({'a_prm': EnvVrtnMdl(dev_vrtn_mdl=Normal(0, 2, test_seed=5746)),
-                       'b_prm': EnvVrtnMdl(dev_vrtn_mdl=Gamma(1, 3, test_seed=4635))},
-                      {'b_prm': MeasInstrument(precision=2)}, 'Very Special Env')
-    assert env.name == 'Very Special Env'
-    assert env.get_meas_instm('b_prm').measure(4.3674) == 4.4
-    assert env.gen_env_cond_vals({'a_prm': 80, 'b_prm': -1})[0]['a_prm'].round(3)[0][0][0] == 83.197
-    # Test that the sensor value generation is working correctly
-    assert np.allclose(env.gen_env_cond_vals({'a_prm': 80, 'b_prm': -1},
-                                             sensor_counts={'b_prm': 3})[1]['b_prm'].round(3), [1.449, -0.333, 1.841])
 
+    # Now test non-defaults model and instrument use
+    env = PhysTestEnv({'a': EnvVrtnMdl(dev_vrtn_mdl=Normal(0, 2, test_seed=5746)),
+                       'b': EnvVrtnMdl(dev_vrtn_mdl=Gamma(1, 3, test_seed=4635))},
+                      {'b': MeasInstrument(precision=2)}, 'Test Env')
+    assert env.name == 'Test Env'
+    assert env.meas_instm('b').measure(4.3674) == 4.4
+    assert np.allclose(np.round(env.vrtn_mdl('b').gen_env_vrtns(-1, 3, 2, 1), 2),
+                       np.array([[[2.62, -0.69, 1.45], [-0.33, 1.84, 0.34]]]))
 
-def test_env_vrtn_model(sequential_var):
-    mdl = EnvVrtnMdl()
-    assert mdl.name is None
-    assert mdl.vrtn_op == 'offset'
-    assert mdl.batch_vrtn_mdl.sample() == 0
-    mdl = EnvVrtnMdl(dev_vrtn_mdl=sequential_var(0, 0.01), chp_vrtn_mdl=sequential_var(0, 0.1),
-                     batch_vrtn_mdl=sequential_var(1, 1))
-    env = PhysTestEnv({'temp': mdl})
-    assert np.allclose(env.gen_env_cond_vals({'temp': 45}, (2, 2, 2))[0]['temp'],
-                       np.array([[[46, 46.01], [46.12, 46.13]], [[46.24, 46.25], [46.36, 46.37]]]))
-    assert mdl.name == 'temp'
-    mdl.vrtn_op = 'scaling'
-    mdl.dev_vrtn_mdl = Deterministic(3)
-    mdl.chp_vrtn_mdl = Deterministic(2)
-    assert mdl.vrtn_op == 'scaling'
-    assert mdl.gen_env_vrtns(3, 0, 1, 1, 1)[0][0][0] == 18
-    # Test that the sensor value generation is working correctly
-    assert mdl.gen_env_vrtns(3, 2, 1, 1, 1)[1][1] == 18
+    # Now test the generation of sets of environmental conditions
+    assert env.gen_env_cond_vals({'a': 80, 'b': -1}, {'a': 1, 'b': 1})['a']['a'].round(3)[0][0][0] == 83.197
+    with pytest.raises(UserConfigError):
+        env.gen_env_cond_vals({'a': 3, 'b': 4}, ['a'])
+    env.vrtn_mdl('a').dev_vrtn_mdl = sequential_var(0.1, 0.1)
+    env.vrtn_mdl('a').chp_vrtn_mdl = sequential_var(1, 1)
+    env.vrtn_mdl('a').batch_vrtn_mdl = sequential_var(0.5, 0.5)
+
+    def bti_func(time, a, b, x):
+        return (time * a) + (b * x)
+
+    def cond_func(base, b, k):
+        return base + (b * k)
+
+    def hci_func(time, a, y):
+        return (time / a) * y
+
+    dev_mdl = DeviceModel({
+        'bti': DegradedParamModel(DegMechModel(bti_func, mdl_name='deg'), cond_shift_mdl=CondShiftModel(cond_func)),
+        'hci': DegradedParamModel(DegMechModel(hci_func, mdl_name='deg2'))})
+    test_spec = TestSpec([MeasSpec({'bti': 2, 'hci': 3, 'b': 2}, {'a': 13, 'b': 7})], num_chps=2, num_lots=1)
+    report = TestSimReport(test_spec)
+    env_conds = env.gen_env_cond_vals({'a': 4, 'b': 10}, ['bti', 'hci'], report, dev_mdl)
+    assert np.allclose(env_conds['bti']['a'], np.array([[[5.6, 5.7], [6.8, 6.9]]]))
+    assert np.allclose(env_conds['hci']['a'], np.array([[[5.6, 5.7, 5.8], [6.9, 7.0, 7.1]]]))
+    assert not 'b' in env_conds['hci']
+    env.vrtn_mdl('b').batch_vrtn_mdl = sequential_var(2, 1)
+    env.vrtn_mdl('b').chp_vrtn_mdl = sequential_var(0.5, 0.5)
+    env.vrtn_mdl('b').dev_vrtn_mdl = sequential_var(0.1, 0.1)
+    env_conds = env.gen_env_cond_vals({'a': 2, 'b': 10}, ['bti', 'hci', 'b'], report, dev_mdl, 'measure')
+    assert np.allclose(env_conds['bti']['b'], np.array([[[12.6, 12.7], [13.3, 13.4]]]))
+    assert np.allclose(env_conds['b']['b'], np.array([[[12.6], [13.2]]]))

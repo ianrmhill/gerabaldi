@@ -19,7 +19,7 @@ def test_init_state_basic():
     def silly_eqn(time, rhyme): return rhyme * time
     deg_model = DeviceModel(DegradedParamModel(DegMechModel(silly_eqn, mdl_name='some mech', rhyme=LatentVar(deter_val=2)),
                                                prm_name='some param'))
-    init_state = gerabaldi.gen_init_state(deg_model, device_counts={'some param': 10})
+    init_state = gerabaldi.gen_init_state(deg_model, dev_counts={'some param': 10})
     # Check all the defaults
     assert type(init_state) == TestSimState
     assert init_state.latent_var_vals['some param']['some mech']['rhyme'][0][0][0] == 2
@@ -41,7 +41,7 @@ def test_init_state_basic():
                                         init_val=LatentVar(deter_val=0, vrtn_type='offset',
                                                            chp_vrtn_mdl=Normal(-0.2, 2, test_seed=5555))))})
     # Run the initial state generator
-    init_state = gerabaldi.gen_init_state(deg_model, device_counts={'freq': 10, 'gain': 5}, chip_count=3, lot_count=4)
+    init_state = gerabaldi.gen_init_state(deg_model, dev_counts={'freq': 10, 'gain': 5}, num_chps=3, num_lots=4)
     assert round(init_state.latent_var_vals['gain']['cond']['base'][3][2][2], 5) == 1.01015
     assert round(init_state.init_prm_vals['freq'][0][0][5], 5) == 1.03063
     assert round(init_state.curr_prm_vals['gain'][1][2][2], 5) == -1.99403
@@ -51,34 +51,36 @@ def test_sim_stress_step_basic():
     # Basic execution and type checking first
     stress_step = StrsSpec({'temp': 125}, timedelta(hours=20))
     meas_step = MeasSpec({'current': 3}, {'temp': 25})
-    test_spec = TestSpec([meas_step, stress_step, meas_step], 2, 2)
+    test_spec = TestSpec([meas_step, stress_step, meas_step], 4, 2)
     # Setup initial test state
     def linear_deg(scale_factor, temp, time): return scale_factor * np.log(temp * time)
     deg_model = DeviceModel({'current': DegradedParamModel(DegMechModel(linear_deg, scale_factor=LatentVar(deter_val=2e-4),
                                                                         mdl_name='mech1'),
                                                            InitValModel(init_val=LatentVar(deter_val=4e-3)))})
-    prior_state = gerabaldi.gen_init_state(deg_model, test_spec)
+    prior_state = gerabaldi.gen_init_state(deg_model, test_spec.calc_samples_needed(), test_spec.num_chps, test_spec.num_lots)
     test_env = PhysTestEnv()
+    report = TestSimReport(test_spec)
 
     # Run the function being tested
-    post_stress_state, stress_report = _sim_stress_step(stress_step, prior_state, deg_model, test_env)
+    post_stress_state = _sim_stress_step(stress_step, prior_state, deg_model, test_env, report)
 
     # Check types and returned values
     assert type(post_stress_state) == TestSimState
     assert round(post_stress_state.elapsed.total_seconds() / SECONDS_PER_HOUR, 2) == 20.00
     assert round(post_stress_state.curr_prm_vals['current'][0][1][2], 5) == 0.00556
-    assert stress_report['stress step'][0] == 'unspecified'
-    assert stress_report['temp'][0] == 125
+    assert report.stress_summary['stress step'][0] == 'unspecified'
+    assert report.stress_summary['temp'][0] == 125
 
     # Run again to check that the equivalent time back-calculations are working fine
-    post_stress_state, stress_report = _sim_stress_step(stress_step, post_stress_state, deg_model, test_env)
-    assert stress_report['duration'][0] == timedelta(hours=20)
+    post_stress_state = _sim_stress_step(stress_step, post_stress_state, deg_model, test_env, report)
+    assert report.stress_summary['duration'][1] == timedelta(hours=20)
     assert round(post_stress_state.curr_prm_vals['current'][0][1][2], 5) == 0.00570
 
 
 def test_sim_meas_step_basic(sequential_var):
     # Basic execution and type checking first
     meas_step = MeasSpec({'temp': 1, 'current': 8}, {'temp': 125}, 'test_meas_spec')
+    test_spec = TestSpec([meas_step], num_chps=2)
 
     def dummy_eqn(temp):
         return temp * 2
@@ -87,31 +89,33 @@ def test_sim_meas_step_basic(sequential_var):
         return c - (1e-4*(temp - 25))
     sim_model = DeviceModel(
         DegradedParamModel(DegMechModel(dummy_eqn, mdl_name='dummy'),
-                           InitValModel(init_val=LatentVar(deter_val=4e-2, dev_vrtn_mdl=sequential_var(1, 1e-2, test_seed=988),
+                           InitValModel(init_val=LatentVar(deter_val=4e-2, dev_vrtn_mdl=sequential_var(1, 1e-2),
                                                            vrtn_type='offset')),
                            CondShiftModel(cond_eqn, c=LatentVar(deter_val=1e-2,
-                                                                dev_vrtn_mdl=sequential_var(0, 1e-3, test_seed=987),
+                                                                dev_vrtn_mdl=sequential_var(0, 1e-3),
                                                                 vrtn_type='offset')),
                            prm_name='current'))
     test_env = PhysTestEnv(meas_instms={'temp': MeasInstrument('temp', precision=2),
                                       'current': MeasInstrument('current', precision=5)})
 
-    deg_state = gerabaldi.gen_init_state(sim_model, device_counts={'current': 10}, elapsed_time=10, chip_count=2)
+    deg_state = gerabaldi.gen_init_state(sim_model, dev_counts={'current': 10}, elapsed_time=10, num_chps=2)
+    report = TestSimReport(test_spec)
 
-    results = _sim_meas_step(meas_step, deg_state, sim_model, test_env)
-    assert type(results) == pd.DataFrame
-    assert round(results['measured'][0], 5) == 120
-    assert results['param'][0] == 'temp'
-    assert round(results['measured'][2], 5) == 1.051
-    assert results['chip #'][16] == 1
-    assert round(results['measured'][12], 5) == 1.161
+    _sim_meas_step(meas_step, deg_state, sim_model, test_env, report)
+    assert type(report.measurements) == pd.DataFrame
+    assert np.round(report.measurements['measured'][0], 5) == 120
+    assert report.measurements['param'][0] == 'temp'
+    assert np.round(report.measurements['measured'][2], 5) == 1.051
+    assert report.measurements['chip #'][16] == 1
+    assert np.round(report.measurements['measured'][12], 5) == 1.183
 
 
 def test_wearout_test_sim_basic():
     # Test a basic case first to ensure flow is working correctly
     meas = MeasSpec({'temp': 1, 'current': 3}, {'temp': 40}, name='cold but not too cold')
     strs = StrsSpec({'temp': 125}, timedelta(hours=10), name='Gimme 10')
-    test = TestSpec([meas, strs, meas, strs, meas], description='Test test test test', name='Test!')
+    test = TestSpec([meas, strs, meas, strs, meas], description='Test test test test', name='Test!',
+                    num_chps=3, num_lots=2)
 
     def log_deg(scale_factor, temp, time): return scale_factor * np.log(temp * time)
     deg_model = DeviceModel(DegradedParamModel(
@@ -122,7 +126,7 @@ def test_wearout_test_sim_basic():
         prm_name='current'))
 
     test_env = PhysTestEnv()
-    init_state = gerabaldi.gen_init_state(deg_model, device_counts={'current': 3}, chip_count=3, lot_count=2)
+    init_state = gerabaldi.gen_init_state(deg_model, dev_counts={'current': 3}, num_chps=3, num_lots=2)
 
     report = gerabaldi.simulate(test, deg_model, test_env, init_state)
     assert type(report) == TestSimReport
@@ -246,11 +250,11 @@ def test_vts_paper_example_1():
 
     # Now validate a few of the results to ensure reproducibility
     assert round(results['CP:HTOL'].measurements.loc[11]['measured'], 2) == 28.24
-    assert round(results['CP:HTOL'].measurements.loc[147]['measured'], 2) == 24.63
+    assert round(results['CP:HTOL'].measurements.loc[147]['measured'], 2) == 24.72
     assert results['NP:RC'].measurements.loc[7]['chip #'] == 1
     assert results['NP:RC'].measurements.loc[7]['device #'] == 1
-    assert round(results['NP:RC'].measurements.loc[12]['measured'], 2) == 28.52
-    assert round(results['NP:RC'].measurements.loc[147]['measured'], 2) == 16.72
+    assert round(results['NP:RC'].measurements.loc[12]['measured'], 2) == 28.40
+    assert round(results['NP:RC'].measurements.loc[147]['measured'], 2) == 17.36
 
 
 def test_vts_paper_example_2():
@@ -291,8 +295,7 @@ def test_vts_paper_example_2():
             array_computable=False,
             threshold=LatentVar(deter_val=0.5)
         ))
-        init_state = gerabaldi.gen_init_state(tddb_model, test)
-        return gerabaldi.simulate(test, tddb_model, env, init_state)
+        return gerabaldi.simulate(test, tddb_model, env)
 
     #### 1. Define the test procedure ###########
     weekly_moderate_use = StrsSpec({'temp': 65 + CELSIUS_TO_KELVIN, 'v_g': 0.9}, 30, 'Moderate Loading')
@@ -320,5 +323,5 @@ def test_vts_paper_example_2():
     assert results[1].measurements.loc[65]['measured'] == 0.0
     assert results[4].measurements.loc[40]['measured'] == 1.0
     assert results[4].measurements.loc[50]['measured'] == 0.0
-    assert results[3].measurements.loc[43]['measured'] == 1.0
-    assert results[3].measurements.loc[53]['measured'] == 0.0
+    assert results[3].measurements.loc[33]['measured'] == 1.0
+    assert results[3].measurements.loc[43]['measured'] == 0.0

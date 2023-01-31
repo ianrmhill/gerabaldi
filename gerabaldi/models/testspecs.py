@@ -42,14 +42,14 @@ class TestSpec:
     simulate or a set of measurements to take. Notably, however, this class does NOT track simulated degradation, it
     only specifies the test. The simulator persists the degradation and measurements between steps.
     """
-    def __init__(self, sequential_steps: list = None, chp_count: int = 1, lot_count: int = 1,
+    def __init__(self, sequential_steps: list = None, num_chps: int = 1, num_lots: int = 1,
                  description: str = 'none provided', name: str = 'unspecified'):
         # The test steps are a series of stress spec and measurement spec objects in sequential order
         if sequential_steps is None:
             sequential_steps = []
         self.steps = sequential_steps
-        self.num_chps = chp_count
-        self.num_lots = lot_count
+        self.num_chps = num_chps
+        self.num_lots = num_lots
         self.description = description
         self.name = name
 
@@ -106,14 +106,12 @@ class TestSpec:
         for step in self.steps:
             if type(step) == MeasSpec:
                 for prm in step.measurements:
-                    # Ignore measurements of stress conditions, we only care about samples of device parameters
-                    if prm not in step.conditions:
-                        # Add the parameter if not yet encountered
-                        if prm not in samples_needed:
-                            samples_needed[prm] = step.measurements[prm]
-                        # Increase the sample size needed if the measurement requires more than the current amount
-                        elif step.measurements[prm] > samples_needed[prm]:
-                            samples_needed[prm] = step.measurements[prm]
+                    # Add the parameter if not yet encountered
+                    if prm not in samples_needed:
+                        samples_needed[prm] = step.measurements[prm]
+                    # Increase the sample size needed if the measurement requires more than the current amount
+                    elif step.measurements[prm] > samples_needed[prm]:
+                        samples_needed[prm] = step.measurements[prm]
         return samples_needed
 
     def __iter__(self):

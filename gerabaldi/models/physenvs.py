@@ -6,8 +6,16 @@ import pandas as pd
 # For some reason using pd.Series doesn't play well with type annotations
 from pandas import Series
 
+from gerabaldi.models.devices import DeviceModel
+from gerabaldi.models.reports import TestSimReport
 from gerabaldi.models.randomvars import Deterministic, RandomVar
-from gerabaldi.exceptions import InvalidTypeError
+from gerabaldi.exceptions import InvalidTypeError, UserConfigError
+from gerabaldi.helpers import _on_demand_import
+
+# Optional imports are loaded using a helper function that suppresses import errors until attempted use
+pymc = _on_demand_import('pymc')
+pyro = _on_demand_import('pyro', 'pyro-ppl')
+tc = _on_demand_import('torch')
 
 __all__ = ['MeasInstrument', 'EnvVrtnMdl', 'PhysTestEnv']
 
@@ -76,7 +84,7 @@ class MeasInstrument:
             # The calculation for determining the sig figs -> decimal places is pretty standard and widely explained
             # Ternary operator is used to handle special cases that cause the rounding to fail otherwise
             meas_vals = meas_vals.apply(
-                lambda x: x if x == 0 or np.isinf(x) else round(x, self._precision - int(floor(log10(abs(x)))) - 1))
+                lambda x: x if x == 0 or np.isinf(x) else np.round(x, self._precision - int(floor(log10(abs(x)))) - 1))
         if self._range:
             # If the measured value exceeds the measurement range then force it to the limit
             meas_vals = meas_vals.clip(lower=self._range[0], upper=self._range[1])
@@ -94,45 +102,83 @@ class EnvVrtnMdl:
     Specifies the full stochastic model used for generating variations in environmental conditions. This model is quite
     similar to the LatentVar class, with a few key differences related to batches vs. lots and unspecified base vals.
     """
+    # Don't let users add new attributes to the class, helps protect from typos causing bugs
+    __slots__ = ['name', 'vrtn_type', '_unitary', '_op',
+                 'batch_vrtn_mdl', '_batch_vrtns', 'chp_vrtn_mdl', '_chp_vrtns', 'dev_vrtn_mdl', '_dev_vrtns']
+    name: str
+    vrtn_type: str
+    batch_vrtn_mdl: RandomVar
+    chp_vrtn_mdl: RandomVar
+    dev_vrtn_mdl: RandomVar
+
     def __init__(self, dev_vrtn_mdl: RandomVar = None, chp_vrtn_mdl: RandomVar = None, batch_vrtn_mdl: RandomVar = None,
                  vrtn_type: str = 'offset', mdl_name: str = None):
         self.name = mdl_name
-        self.vrtn_type = vrtn_type
+        # Set this first to avoid a circular dependency problem between vrtn_type and <layer>_vrtn_mdl assignment logic
+        self._unitary = 0
         # Note that there are no lot variations here as the test environment is completely ignorant of what lot a device
         # comes from. The analog is variations between test batches, however the simulator treats these as
         # separate tests instead, and so the test would simply be run twice. The env_vrtn_mdl effectively provides a
         # batch variation model, with the number of batches enforced to be one per test.
-        unitary = 0 if self.vrtn_type == 'offset' else 1
-        self.batch_vrtn_mdl = batch_vrtn_mdl if batch_vrtn_mdl else Deterministic(unitary)
-        self.dev_vrtn_mdl = dev_vrtn_mdl if dev_vrtn_mdl else Deterministic(unitary)
-        self.chp_vrtn_mdl = chp_vrtn_mdl if chp_vrtn_mdl else Deterministic(unitary)
-        # To understand why offset is default, consider temperature variation. If it was scaling, a 2% difference is
-        # much greater at high temperatures, leading to variability coupled to the actual value. Although this can
-        # work for latent variable values due to their fixed base value, this is unlikely to be
-        # the intended behaviour for the vast majority of environmental conditions.
-        if vrtn_type not in ['scaling', 'offset']:
-            raise InvalidTypeError(f"Latent {self.name} variation type can only be one of 'scaling', 'offset'.")
-        self.vrtn_op = vrtn_type
+        self.batch_vrtn_mdl = batch_vrtn_mdl
+        self.dev_vrtn_mdl = dev_vrtn_mdl
+        self.chp_vrtn_mdl = chp_vrtn_mdl
+        # To understand why 'offset' is default, consider temperature variation. If it was scaling, a 2% difference is
+        # much greater at high temperatures, leading to variability coupled to the actual value. Although this works for
+        # latent variable values due to their near-fixed base value, this is unlikely to be the intended behaviour for
+        # the vast majority of environmental conditions.
+        self.vrtn_type = vrtn_type
 
-    def gen_env_vrtns(self, base_val: int | float, sensor_count: int = 0,
-                      num_devs: int = 1, num_chps: int = 1, num_lots: int = 1) -> np.ndarray | tuple[np.ndarray, float]:
-        """Generate stochastic variations for the specified number of individual samples, devices, and lots."""
-        op = np.multiply if self.vrtn_op == 'scaling' else np.add
-        # The device variations are held in a 3D array, allowing for easy indexing to the unique value for each sample
-        vals = np.full((num_lots, num_chps, num_devs), base_val)
-        # The generated arrays have to be carefully reshaped for the numpy array operators to broadcast them correctly
-        vals = op(vals, self.dev_vrtn_mdl.
-                  sample(num_lots * num_chps * num_devs).reshape((num_lots, num_chps, num_devs)))
-        vals = op(vals, self.chp_vrtn_mdl.
-                  sample(num_lots * num_chps).reshape((num_lots, num_chps, 1)))
-        # Only sample once for the batch stochastic variation model
-        batch_vrtn = self.batch_vrtn_mdl.sample()
-        if sensor_count:
-            return op(vals, batch_vrtn), op(op(op(np.full(sensor_count, base_val),
-                                                  self.dev_vrtn_mdl.sample(sensor_count)),
-                                            self.chp_vrtn_mdl.sample(sensor_count)), batch_vrtn)
-        else:
-            return op(vals, self.batch_vrtn_mdl.sample(1))
+    def __setattr__(self, name, value):
+        if name == 'vrtn_type':
+            # If changing the variation type we need to also update all the attributes that are used to compute values
+            if value not in ['scaling', 'offset']:
+                raise InvalidTypeError(f"Latent {self.name} variation type can only be one of 'scaling', 'offset'.")
+            # Only need to update all the attributes if the variation type is actually changing
+            if not hasattr(self, 'vrtn_type') or self.vrtn_type != value:
+                self._op = np.multiply if value == 'scaling' else np.add
+                self._unitary = 0 if value == 'offset' else 1
+                # Each variation model that is not user defined is reset to ensure the new unitary value is used
+                if not self._batch_vrtns:
+                    self.batch_vrtn_mdl = None # noqa: PyTypeChecker
+                if not self._chp_vrtns:
+                    self.chp_vrtn_mdl = None # noqa: PyTypeChecker
+                if not self._dev_vrtns:
+                    self.dev_vrtn_mdl = None # noqa: PyTypeChecker
+        # If changing a variation model we need to update it's user-defined status flag and set to a unitary if removed
+        elif name == 'batch_vrtn_mdl':
+            self._batch_vrtns = False if value is None else True
+            if not self._batch_vrtns:
+                value = Deterministic(self._unitary)
+        elif name == 'chp_vrtn_mdl':
+            self._chp_vrtns = False if value is None else True
+            if not self._chp_vrtns:
+                value = Deterministic(self._unitary)
+        elif name == 'dev_vrtn_mdl':
+            self._dev_vrtns = False if value is None else True
+            if not self._dev_vrtns:
+                value = Deterministic(self._unitary)
+        super(EnvVrtnMdl, self).__setattr__(name, value)
+
+    def gen_batch_vrtn(self, base_val: int | float) -> np.ndarray:
+        return self._op(base_val, self.batch_vrtn_mdl.sample())
+
+    def gen_chp_vrtns(self, base_val: int | float | np.ndarray, num_chps: int = 1, num_lots: int = 1) -> np.ndarray:
+        # First create an array of the correct size filled with the base value
+        vals = np.full((num_lots, num_chps), base_val)
+        # Now include the effect of chip-to-chip variations
+        return self._op(vals, self.chp_vrtn_mdl.sample(num_chps * num_lots).reshape((num_lots, num_chps)))
+
+    def gen_dev_vrtns(self, base_vals: int | float | np.ndarray, num_devs: int = 1) -> np.ndarray:
+        # Format the base value into a 2D numpy array if not already in that form to represent 1 chip and 1 batch
+        if type(base_vals) != np.ndarray:
+            base_vals = np.array([[base_vals]])
+        # Note that the operation broadcasting here needs to be done carefully, adding the device dimension to base_vals
+        return self._op(np.expand_dims(base_vals, axis=-1), self.dev_vrtn_mdl.sample(num_devs * base_vals.size).
+                        reshape((base_vals.shape[0], base_vals.shape[1], num_devs)))
+
+    def gen_env_vrtns(self, base_val: int | float, num_devs: int = 1, num_chps: int = 1, num_lots: int = 1) -> np.ndarray:
+        return self.gen_dev_vrtns(self.gen_chp_vrtns(self.gen_batch_vrtn(base_val), num_chps, num_lots), num_devs)
 
 
 class PhysTestEnv:
@@ -150,9 +196,9 @@ class PhysTestEnv:
 
     Methods
     -------
-    get_meas_instm(prm)
+    meas_instm(prm)
         Retrieves the measurement instrument for a requested parameter
-    get_vrtn_mdl(prm)
+    vrtn_mdl(prm)
         Retrieves the variation/variability model for a requested parameter
     gen_env_cond_vals(base_vals)
         Varies a set of parameter values based on the variation models for those parameters
@@ -191,7 +237,7 @@ class PhysTestEnv:
         for prm in meas_instms:
             setattr(self, prm.name + '_instm', prm)
 
-    def get_meas_instm(self, prm: str):
+    def meas_instm(self, prm: str) -> MeasInstrument:
         """
         Get the associated measurement instrument for the param, if none exists then return an ideal one.
 
@@ -207,7 +253,7 @@ class PhysTestEnv:
         """
         return getattr(self, prm + '_instm', MeasInstrument(prm))
 
-    def get_vrtn_mdl(self, prm: str) -> EnvVrtnMdl:
+    def vrtn_mdl(self, prm: str) -> EnvVrtnMdl:
         """
         Get the associated variability model for the passed parameter.
 
@@ -223,40 +269,47 @@ class PhysTestEnv:
         """
         return getattr(self, prm + '_var', EnvVrtnMdl())
 
-    def gen_env_cond_vals(self, base_vals: dict, num_vals: tuple | int = 1, sensor_counts: dict = None):
-        """
-        Generate 'true' values for test environment conditions by introducing variations to the intended values.
-
-        Parameters
-        ----------
-        base_vals: dict of int or float
-            The intended values for the parameters to be adjusted, the keys are the parameter names
-        num_vals: int or tuple of int, optional
-            Specifies the number and dimensional shape of values to generate per condition, defaults to 1
-        sensor_counts: dict, optional
-            If provided, additional conditional values will be generated for environmental sensors to measure
-
-        Returns
-        -------
-        true_vals: dict of ndarray
-            The adjusted/varied values identically formatted to the original intended values
-        sensor_vals: dict of ndarray, only returned if 'sensor_counts' is provided
-            Varied values representing the condition value at an environmental sensor head
-        """
-        num_vals = (1, 1, num_vals) if type(num_vals) == int else num_vals
-        true_vals = {}
-        sensor_vals = {}
+    def gen_env_cond_vals(self, base_vals: dict, prms: list | dict, test_info: TestSimReport = None,
+                          dev_mdl: DeviceModel = None, target: str = 'stress', num_chps: int = 1, num_lots: int = 1):
+        # First generate the chip variations for all conditions, as these are shared across parameters whereas device
+        # specific conditions are unique and environmental conditions are oblivious to what lot a chip is from
+        num_chps = test_info.num_chps if test_info else num_chps
+        num_lots = test_info.num_lots if test_info else num_lots
+        batch, chip = {}, {}
         for cond in base_vals:
-            if not sensor_counts or cond not in sensor_counts.keys():
-                true_vals[cond] = self.get_vrtn_mdl(cond).\
-                    gen_env_vrtns(base_vals[cond], num_devs=num_vals[2], num_chps=num_vals[1], num_lots=num_vals[0])
-            else:
-                true_vals[cond], sensor_vals[cond] = self.get_vrtn_mdl(cond)\
-                    .gen_env_vrtns(base_vals[cond], sensor_counts[cond], num_vals[2], num_vals[1], num_vals[0])
-        # Important design note: The reason the conditional values for the sensor readings are generated at the same
-        # time as the ones for the device parameters is because the batch variations need to match between the sensors
-        # and parameters. The individual and device variations are unique for the sensors, but the batch is shared.
-        if not sensor_counts:
-            return true_vals, {}
+            batch[cond] = self.vrtn_mdl(cond).gen_batch_vrtn(base_vals[cond])
+            chip[cond] = self.vrtn_mdl(cond).gen_chp_vrtns(batch[cond], num_chps, num_lots)
+
+        # If prms is a dictionary the values will be the number of devices to measure, otherwise we use the test info
+        # dev counts as the reference for how many devices to generate condition values for
+        if type(prms) == dict:
+            prm_list = list(prms.keys())
+            dev_counts = prms
         else:
-            return true_vals, sensor_vals
+            prm_list = prms
+            if not test_info:
+                raise UserConfigError('Generating environmental condition values requires device counts to be specified'
+                                      'either via the test report or through the "prms" argument.')
+            dev_counts = test_info.dev_counts
+
+        # Now generate the device variations for each necessary condition for each parameter
+        cond_vals = {}
+        for prm in prm_list:
+            # Determine which environmental conditions are relevant to the current parameter to avoid doing extra work
+            if dev_mdl and prm in dev_mdl.prm_mdl_list:
+                depend_conds = dev_mdl.prm_mdl(prm).get_dependencies(list(base_vals.keys()), target)
+                cond_vals[prm] = {}
+                for cond in depend_conds:
+                    cond_vals[prm][cond] = self.vrtn_mdl(cond).gen_dev_vrtns(chip[cond], dev_counts[prm])
+            else:
+                # If the parameter isn't a device parameter then it must be one of the environmental conditions itself,
+                # which since is not specified as part of the device model is assumed to be measured by a sensor(s) in
+                # the test environment. We therefore treat each condition measurement sensor as a separate chip+device
+                # in terms of stochastic variations, but shares the same test batch variation.
+                # This assignment is left for readability purposes to make the following line less confusing
+                cond = prm
+                sensor_vals = self.vrtn_mdl(cond).gen_chp_vrtns(batch[cond], dev_counts[prm])
+                # We treat each sensor as a separate chip with only 1 device for measurement each
+                cond_vals[prm] = {cond: self.vrtn_mdl(cond).gen_dev_vrtns(sensor_vals, 1)}
+
+        return cond_vals

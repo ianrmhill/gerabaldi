@@ -96,6 +96,7 @@ class LatentVar:
                 raise NotImplementedError(f"Requested target CBI framework {target_framework} is not yet supported.")
 
             # If a deterministic value was used we may still be able to convert the variable to a probabilistic form
+            old_centre = None
             if self.deter_val:
                 # If the dev_vrtn_mdl distribution has a "centre" we can set the centre to the deterministic value and
                 # proceed, however if the distribution is bimodal, uniform, etc. an error must be raised.
@@ -128,7 +129,7 @@ class LatentVar:
             else:
                 cbi_dist = self.dev_vrtn_mdl.get_cbi_form(target_framework=target_framework)
             # Return the dev_vrtn_mdl centre value to previous if it was changed to avoid any side effects
-            if self.deter_val:
+            if old_centre:
                 self.dev_vrtn_mdl.set_centre(old_centre)
             return cbi_dist
         else:
@@ -449,6 +450,15 @@ class DegradedParamModel(LatentModel):
                 new[key] = self._set_to_single_index(new[key], i, j, k)
         return new
 
+    def _reduce_dev_dim_size(self, vals: dict, reduced_size: int) -> dict:
+        new = deepcopy(vals)
+        for key, val in new.items():
+            if type(val) == list or type(val) == np.ndarray:
+                new[key] = val[:, :, :reduced_size]
+            elif type(val) == dict:
+                new[key] = self._reduce_dev_dim_size(new[key], reduced_size)
+        return new
+
     def calc_equiv_strs_times(self, mech_deg_vals: dict, strs_conds: dict,
                               init_vals: dict, latents: dict) -> np.ndarray:
         """
@@ -619,8 +629,13 @@ class DegradedParamModel(LatentModel):
         """
         if self.array_compute:
             arg_vals = deepcopy(latents)
+            arg_vals['init'] = degraded_vals
 
-            # First calculate the conditional shift model value
+            # First check if we are measuring all the devices, if not we need to truncate some values
+            if num_samples < arg_vals['init'].shape[2]:
+                arg_vals = self._reduce_dev_dim_size(arg_vals, num_samples)
+
+            # Calculate the conditional shift model value
             cond_sig = inspect.signature(self.cond_mdl.compute)
             # Add all stress condition values to the already well formatted latents dict
             for arg in cond_sig.parameters.keys():
@@ -630,11 +645,9 @@ class DegradedParamModel(LatentModel):
 
             # Now set the initial values to the degraded values since they fill the same role in the parameter compute
             # equation, and set the mechanism degradation models to their unitary values
-            arg_vals['init'] = degraded_vals
             for mech in self.mech_mdl_list:
                 arg_vals[mech] = self.mech_mdl(mech).unitary
-
-            shifted_vals = self.compute(**arg_vals)[:][:][:num_samples]
+            shifted_vals = self.compute(**arg_vals)
         else:
             dims = degraded_vals.shape
             # If the number of samples to measure is less than inds, we can truncate
@@ -673,6 +686,21 @@ class DegradedParamModel(LatentModel):
             arg_vals[mech] = self.mech_mdl(mech).unitary
         return self.compute(**arg_vals)
 
+    def get_dependencies(self, conditions, target):
+        # Typically no environmental conditions will be used in the parameter compute function, but check just in case
+        all_args = inspect.signature(self.compute)
+        depends_conds = [arg for arg in all_args.parameters.keys() if arg in conditions]
+        # Only want the dependencies that affect either a stress phase or a measurement
+        if target == 'stress':
+            for mech in self.mech_mdl_list:
+                all_args = inspect.signature(self.mech_mdl(mech).compute)
+                depends_conds.extend([arg for arg in all_args.parameters.keys() if arg in conditions])
+        else:
+            all_args = inspect.signature(self.cond_mdl.compute)
+            depends_conds.extend([arg for arg in all_args.parameters.keys() if arg in conditions])
+        # There is a chance to have overlapping environmental condition dependencies, so remove any duplicates
+        return [*set(depends_conds)]
+
 
 class CircuitParamModel(LatentModel):
     """
@@ -694,6 +722,12 @@ class CircuitParamModel(LatentModel):
 
         circ_vals = self.compute(**arg_vals)[:][:][:num_samples]
         return circ_vals
+
+    def get_dependencies(self, conditions, target):
+        # Note that 'target' is an unused argument here, but needs to be kept to match the signature of get_dependencies
+        # for the DegradedParamModel class
+        all_args = inspect.signature(self.compute)
+        return [arg for arg in all_args.parameters.keys() if arg in conditions]
 
 
 class DeviceModel:
