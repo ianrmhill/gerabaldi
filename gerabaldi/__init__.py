@@ -22,12 +22,12 @@ None yet
 """
 
 # This determines the project version for PyPi as well
-__version__ = '0.0.11'
+__version__ = '0.0.12'
 
 from . import models
 from . import cookbook
-from .sim import *
+from .sim import simulate, gen_init_state
 
-__all__ = sim.__all__
+__all__ = ['simulate', 'gen_init_state', 'models', 'cookbook']
 __all__.extend(models.__all__)
 __all__.extend(cookbook.__all__)
