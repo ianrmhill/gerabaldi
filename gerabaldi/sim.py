@@ -2,7 +2,6 @@
 Gerabaldi top-level simulation flow functions
 """
 
-import copy
 import pandas as pd
 import numpy as np
 from datetime import timedelta
@@ -15,8 +14,8 @@ __all__ = ['simulate', 'gen_init_state']
 SECONDS_PER_HOUR = 3600
 
 
-def gen_init_state(dev_mdl: DeviceModel, dev_counts: dict, num_chps: int = 1, num_lots: int = 1,
-                   elapsed_time: timedelta | int | float = timedelta()):
+def gen_init_state(dev_mdl: DeviceMdl, dev_counts: dict = None, num_chps: int = 1, num_lots: int = 1,
+                   quantity_info: TestSimReport = None, elapsed_time: timedelta | int | float = timedelta()) -> TestSimState:
     """
     This function prepares a test state object for a specified set of test circuits and their states for use in a
     reliability test.
@@ -32,42 +31,58 @@ def gen_init_state(dev_mdl: DeviceModel, dev_counts: dict, num_chps: int = 1, nu
     Returns
     -------
     init_state
-
     """
-    # The number of samples of different parameters, chip, and lot counts can either be specified directly or
-    # inferred based on the target test that will be conducted on the generated state
-    num_devs, num_chps, num_lots = dev_counts, num_chps, num_lots
+    # First determine the source that will determine how many instances/devices for each parameter to initialize
+    if quantity_info and not dev_counts:
+        devs, chps, lots = quantity_info.dev_counts, quantity_info.num_chps, quantity_info.num_lots
+    elif dev_counts:
+        devs, chps, lots = dev_counts, num_chps, num_lots
+    else:
+        raise UserConfigError('The number of devices for each parameter must be specified either manually or by report.'
+                              'Cannot provide neither or both.')
 
-    # Generate the initial state for the test, all values that need to be persisted are kept in the simulation state
-    init_state = TestSimState(dev_mdl.gen_init_vals(num_devs, num_chps, num_lots),
-                              dev_mdl.gen_init_mech_vals(num_devs, num_chps, num_lots),
-                              dev_mdl.gen_latent_vals(num_devs, num_chps, num_lots), elapsed_time)
+    # Check the parameter dependencies for each circuit parameter that could depend on one or more degraded parameters
+    for circ_prm in [prm for prm in devs if type(dev_mdl.prm_mdl(prm)) == CircPrmMdl]:
+        for required_prm in dev_mdl.prm_mdl(circ_prm).get_required_prms(dev_mdl.prm_mdl_list):
+            # Ensure that enough of the required degraded parameters are specified to support the circuit parameters
+            if required_prm not in devs.keys() or devs[required_prm] < devs[circ_prm]:
+                devs[required_prm] = devs[circ_prm]
+                # If a report was used to specify device counts, update the report to include the changes
+                if quantity_info:
+                    quantity_info.dev_counts[required_prm] = devs[circ_prm]
+
+    # Now initialize the physical state and override the elapsed time if specified
+    init_state = dev_mdl.gen_init_state(devs, chps, lots)
+    if elapsed_time != 0:
+        init_state.elapsed = elapsed_time
     return init_state
 
 
-def _sim_stress_step(step: StrsSpec, prior_state: TestSimState, sim_model: DeviceModel,
+def _sim_stress_step(step: StrsSpec, sim_state: TestSimState, dev_mdl: DeviceMdl,
                      test_env: PhysTestEnv, report: TestSimReport):
-    sim_state = copy.deepcopy(prior_state)
-
     # 1. Build the stochastically-adjusted set of stress conditions
     # Only need to generate stress conditions for device parameters that degrade, get the list of those parameters
-    deg_prm_list = [prm for prm in sim_model.prm_mdl_list if type(sim_model.prm_mdl(prm)) == DegradedParamModel]
-    cond_vals = test_env.gen_env_cond_vals(step.conditions, deg_prm_list, report, sim_model, 'stress')
+    deg_prm_list = [prm for prm in dev_mdl.prm_mdl_list if type(dev_mdl.prm_mdl(prm)) == DegPrmMdl]
+    cond_vals = test_env.gen_env_cond_vals(step.conditions, deg_prm_list, report, dev_mdl, 'stress')
 
-    # 2. Calculate the equivalent stress times that would have been needed under the generated stress conditions to
-    # obtain the prior degradation values.
-    equiv_times = sim_model.calc_equiv_times(prior_state.curr_deg_mech_vals, cond_vals, prior_state.init_deg_mech_vals,
-                                             prior_state.latent_var_vals)
-    for prm in equiv_times:
-        for mech in equiv_times[prm]:
-            equiv_times[prm][mech] = np.add(equiv_times[prm][mech], step.duration.total_seconds() / SECONDS_PER_HOUR)
+    for prm in deg_prm_list:
+        # 2. Calculate the equivalent stress times that would have been needed under the generated stress conditions to
+        # obtain the prior degradation values. First we calculate the equivalent time to reach the current value of degradation
+        equiv_times = dev_mdl.prm_mdl(prm).calc_equiv_strs_times(
+            (report.num_lots, report.num_chps, report.dev_counts[prm]),
+            sim_state.curr_deg_mech_vals[prm], cond_vals[prm], sim_state.init_deg_mech_vals[prm], sim_state.latent_var_vals[prm])
+        # Now add on the time for the current stress phase
+        for mech in equiv_times:
+            equiv_times[mech] += step.duration.total_seconds() / SECONDS_PER_HOUR
 
-    # 3. Simulate the degradation for each device after adding the equivalent prior stress time
-    sim_state.curr_prm_vals, sim_state.curr_deg_mech_vals =\
-        sim_model.calc_dev_degradation(equiv_times, cond_vals, prior_state.init_prm_vals, prior_state.latent_var_vals,
-                                       prior_state.curr_deg_mech_vals)
+        # 3. Simulate the degradation for each device after adding the equivalent prior stress time
+        sim_state.curr_prm_vals[prm], sim_state.curr_deg_mech_vals[prm] = dev_mdl.prm_mdl(prm).calc_deg_vals(
+            (report.num_lots, report.num_chps, report.dev_counts[prm]),
+            equiv_times, cond_vals[prm], sim_state.init_prm_vals[prm], sim_state.latent_var_vals[prm], sim_state.curr_deg_mech_vals[prm]
+        )
+
     # Update the elapsed real-world test time
-    sim_state.elapsed = prior_state.elapsed + step.duration
+    sim_state.elapsed += step.duration
 
     # 4. Report the stress conditions used during this step
     merged = {'stress step': step.name, 'duration': step.duration,
@@ -76,10 +91,8 @@ def _sim_stress_step(step: StrsSpec, prior_state: TestSimState, sim_model: Devic
     stress_report = pd.DataFrame(merged, index=[0])
     report.add_stress_report(stress_report)
 
-    return sim_state
 
-
-def _sim_meas_step(step: MeasSpec, deg_data: TestSimState, sim_model: DeviceModel,
+def _sim_meas_step(step: MeasSpec, sim_state: TestSimState, dev_mdl: DeviceMdl,
                    test_env: PhysTestEnv, report: TestSimReport):
     """
     Given a test measurement specification, generate the set of observed values. The baseline/true parameter values
@@ -89,25 +102,26 @@ def _sim_meas_step(step: MeasSpec, deg_data: TestSimState, sim_model: DeviceMode
     # Loop through the parameters to measure and determine if they are degraded parameters or independent conditions
     meas_results = pd.DataFrame()
     # Generate 'true' values for environmental conditions specified by the step (using their variability models)
-    env_conds = test_env.gen_env_cond_vals(step.conditions, step.measurements, report, sim_model, 'measure')
+    env_conds = test_env.gen_env_cond_vals(step.conditions, step.measurements, report, dev_mdl, 'measure')
 
     for prm in step.measurements:
         # There are three types of parameters: environmental conditions, degraded parameters and derived parameters
-        if prm in deg_data.curr_prm_vals:
+        if prm in sim_state.curr_prm_vals:
             # Adjust the param values based on environmental conditions during measurement and the instrument used
-            measured = sim_model.prm_mdl(prm).calc_cond_shifted_vals(
-                step.measurements[prm], env_conds[prm], deg_data.curr_prm_vals[prm], deg_data.latent_var_vals[prm])
-            measured = TestSimReport.format_measurements(measured, prm, deg_data.elapsed, 'parameter')
+            measured = dev_mdl.prm_mdl(prm).calc_cond_shifted_vals(
+                (report.num_lots, report.num_chps, step.measurements[prm]),
+                env_conds[prm], sim_state.curr_prm_vals[prm], sim_state.latent_var_vals[prm])
+            measured = TestSimReport.format_measurements(measured, prm, sim_state.elapsed, 'parameter')
 
-        elif prm in sim_model.prm_mdl_list:
+        elif prm in dev_mdl.prm_mdl_list:
             # Derived parameter values that can depend on multiple degraded parameters, i.e. circuit models
-            measured = sim_model.prm_mdl(prm).calc_circ_vals(
-                step.measurements[prm], env_conds[prm], deg_data.curr_prm_vals, deg_data.latent_var_vals[prm])
-            measured = TestSimReport.format_measurements(measured, prm, deg_data.elapsed, 'parameter')
+            measured = dev_mdl.prm_mdl(prm).calc_circ_vals(
+                step.measurements[prm], env_conds[prm], sim_state.curr_prm_vals, sim_state.latent_var_vals[prm])
+            measured = TestSimReport.format_measurements(measured, prm, sim_state.elapsed, 'parameter')
 
         elif prm in step.conditions:
             # These parameters are not degraded parameters of the device but instead environmental parameters
-            measured = TestSimReport.format_measurements(env_conds[prm][prm], prm, deg_data.elapsed, 'condition')
+            measured = TestSimReport.format_measurements(env_conds[prm][prm], prm, sim_state.elapsed, 'condition')
 
         else:
             raise MissingParamError(f"Requested measurement of param '{prm}' failed, param is not defined within the \
@@ -118,18 +132,18 @@ def _sim_meas_step(step: MeasSpec, deg_data: TestSimState, sim_model: DeviceMode
         meas_results = pd.concat((meas_results, measured), ignore_index=True)
 
     if step.verbose:
-        print(f"Conducted measurement {step.name} at simulation time {deg_data.elapsed}.")
+        print(f"Conducted measurement {step.name} at simulation time {sim_state.elapsed}.")
     report.add_measurements(meas_results)
 
 
-def simulate(test_def: TestSpec, sim_model: DeviceModel, test_env: PhysTestEnv, init_state: TestSimState = None):
+def simulate(test_def: TestSpec, dev_mdl: DeviceMdl, test_env: PhysTestEnv, init_state: TestSimState = None):
     """
     Simulate a given wear-out test using a given underlying model
 
     Parameters
     ----------
     test_def : A complete test description that the defines the stress conditions, durations, and data to collect
-    sim_model : The underlying exact degradation model(s) to use to generate simulated test results
+    dev_mdl : The underlying exact degradation model(s) to use to generate simulated test results
     test_env : Definition of the test environment that determines how imprecision is injected into the test results
     init_state: The starting values for the different device parameters that will degrade as the test proceeds
 
@@ -140,17 +154,20 @@ def simulate(test_def: TestSpec, sim_model: DeviceModel, test_env: PhysTestEnv, 
     # The test report object assembles all the collected test data into one data structure and tracks configuration info
     test_report = TestSimReport(test_def)
 
+    # Prepare the simulation data persistence structure
     if not init_state:
-        init_state = gen_init_state(sim_model, test_report.dev_counts, test_report.num_chps, test_report.num_lots)
-    # Prepare the simulation data persistence structure, need a copy as we must also persist the initial values
-    deg_state = copy.deepcopy(init_state)
+        sim_state = gen_init_state(dev_mdl, quantity_info=test_report)
+    else:
+        # TODO: Ensure simulate doesn't modify the arguments (likely only init_state at risk of modification)
+        #       this may be best achieved by giving TestSimState a copy method
+        sim_state = init_state
 
-    # We now begin to execute the test step by step, sequentially performing measurements and stress intervals in order
+    # We now execute the test step by step, sequentially performing measurements and stress intervals in order
+    # Note that sim_state and test_report are mutated as the test progresses, the other arguments are left untouched
     for step in test_def:
         # Check whether the next step is a measurement or period of stress
         if type(step) is StrsSpec:
-            deg_state = _sim_stress_step(step, deg_state, sim_model, test_env, test_report)
+            _sim_stress_step(step, sim_state, dev_mdl, test_env, test_report)
         elif type(step) is MeasSpec:
-            _sim_meas_step(step, deg_state, sim_model, test_env, test_report)
-
+            _sim_meas_step(step, sim_state, dev_mdl, test_env, test_report)
     return test_report

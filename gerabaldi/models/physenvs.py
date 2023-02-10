@@ -6,7 +6,7 @@ import pandas as pd
 # For some reason using pd.Series doesn't play well with type annotations
 from pandas import Series
 
-from gerabaldi.models.devices import DeviceModel
+from gerabaldi.models.devices import DeviceMdl
 from gerabaldi.models.reports import TestSimReport
 from gerabaldi.models.randomvars import Deterministic, RandomVar
 from gerabaldi.exceptions import InvalidTypeError, UserConfigError
@@ -270,7 +270,7 @@ class PhysTestEnv:
         return getattr(self, prm + '_var', EnvVrtnMdl())
 
     def gen_env_cond_vals(self, base_vals: dict, prms: list | dict, test_info: TestSimReport = None,
-                          dev_mdl: DeviceModel = None, target: str = 'stress', num_chps: int = 1, num_lots: int = 1):
+                          dev_mdl: DeviceMdl = None, target: str = 'stress', num_chps: int = 1, num_lots: int = 1):
         # First generate the chip variations for all conditions, as these are shared across parameters whereas device
         # specific conditions are unique and environmental conditions are oblivious to what lot a chip is from
         num_chps = test_info.num_chps if test_info else num_chps

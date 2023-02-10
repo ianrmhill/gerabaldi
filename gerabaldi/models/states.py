@@ -4,8 +4,16 @@ Custom classes for simulation results reporting and state persistence.
 
 from datetime import timedelta
 from copy import deepcopy
+import numpy as np
 
 __all__ = ['TestSimState']
+
+
+class ArrayTree:
+    """
+    Class to try to speed up the whole copy and modify process for Gerabaldi state data
+    """
+    value: np.array
 
 
 class TestSimState:

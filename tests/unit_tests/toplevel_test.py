@@ -1,6 +1,7 @@
 """Tests to ensure the degradation simulator module works according to the intended simulation flow and feature set."""
 
 import pytest
+import time
 from datetime import timedelta
 import numpy as np
 import pandas as pd
@@ -17,7 +18,7 @@ SECONDS_PER_HOUR = 3600
 def test_init_state_basic():
     # Start with bare minimum specification to test that mainly defaults results in the expected initial state
     def silly_eqn(time, rhyme): return rhyme * time
-    deg_model = DeviceModel(DegradedParamModel(DegMechModel(silly_eqn, mdl_name='some mech', rhyme=LatentVar(deter_val=2)),
+    deg_model = DeviceMdl(DegPrmMdl(DegMechMdl(silly_eqn, mdl_name='some mech', rhyme=LatentVar(deter_val=2)),
                                                prm_name='some param'))
     init_state = gerabaldi.gen_init_state(deg_model, dev_counts={'some param': 10})
     # Check all the defaults
@@ -28,16 +29,16 @@ def test_init_state_basic():
     assert init_state.elapsed == timedelta()
     # Now for testing general argument options
     def silly_2(base): return base
-    deg_model = DeviceModel(
-        {'freq': DegradedParamModel(DegMechModel(silly_eqn, mdl_name='some mech'),
-                                    InitValModel(init_val=LatentVar(deter_val=1, dev_vrtn_mdl=Normal(1, 0.01, test_seed=2222),
+    deg_model = DeviceMdl(
+        {'freq': DegPrmMdl(DegMechMdl(silly_eqn, mdl_name='some mech'),
+                                    InitValMdl(init_val=LatentVar(deter_val=1, dev_vrtn_mdl=Normal(1, 0.01, test_seed=2222),
                                                                     lot_vrtn_mdl=Normal(1, 0.01, test_seed=3333)))),
-         'gain': DegradedParamModel(DegMechModel(silly_eqn, mdl_name='some other mech'),
-                                    cond_shift_mdl=CondShiftModel(silly_2,
+         'gain': DegPrmMdl(DegMechMdl(silly_eqn, mdl_name='some other mech'),
+                                    cond_shift_mdl=CondShiftMdl(silly_2,
                                                                   base=LatentVar(deter_val=0, dev_vrtn_mdl=Normal(1, 0.02,
                                                                                                         test_seed=4444),
                                                                                  vrtn_type='offset')),
-                                    init_val_mdl=InitValModel(
+                                    init_val_mdl=InitValMdl(
                                         init_val=LatentVar(deter_val=0, vrtn_type='offset',
                                                            chp_vrtn_mdl=Normal(-0.2, 2, test_seed=5555))))})
     # Run the initial state generator
@@ -54,27 +55,27 @@ def test_sim_stress_step_basic():
     test_spec = TestSpec([meas_step, stress_step, meas_step], 4, 2)
     # Setup initial test state
     def linear_deg(scale_factor, temp, time): return scale_factor * np.log(temp * time)
-    deg_model = DeviceModel({'current': DegradedParamModel(DegMechModel(linear_deg, scale_factor=LatentVar(deter_val=2e-4),
+    deg_model = DeviceMdl({'current': DegPrmMdl(DegMechMdl(linear_deg, scale_factor=LatentVar(deter_val=2e-4),
                                                                         mdl_name='mech1'),
-                                                           InitValModel(init_val=LatentVar(deter_val=4e-3)))})
-    prior_state = gerabaldi.gen_init_state(deg_model, test_spec.calc_samples_needed(), test_spec.num_chps, test_spec.num_lots)
+                                                           InitValMdl(init_val=LatentVar(deter_val=4e-3)))})
+    phys_state = gerabaldi.gen_init_state(deg_model, test_spec.calc_samples_needed(), test_spec.num_chps, test_spec.num_lots)
     test_env = PhysTestEnv()
     report = TestSimReport(test_spec)
 
     # Run the function being tested
-    post_stress_state = _sim_stress_step(stress_step, prior_state, deg_model, test_env, report)
+    _sim_stress_step(stress_step, phys_state, deg_model, test_env, report)
 
     # Check types and returned values
-    assert type(post_stress_state) == TestSimState
-    assert round(post_stress_state.elapsed.total_seconds() / SECONDS_PER_HOUR, 2) == 20.00
-    assert round(post_stress_state.curr_prm_vals['current'][0][1][2], 5) == 0.00556
+    assert type(phys_state) == TestSimState
+    assert round(phys_state.elapsed.total_seconds() / SECONDS_PER_HOUR, 2) == 20.00
+    assert round(phys_state.curr_prm_vals['current'][0][1][2], 5) == 0.00556
     assert report.stress_summary['stress step'][0] == 'unspecified'
     assert report.stress_summary['temp'][0] == 125
 
     # Run again to check that the equivalent time back-calculations are working fine
-    post_stress_state = _sim_stress_step(stress_step, post_stress_state, deg_model, test_env, report)
+    _sim_stress_step(stress_step, phys_state, deg_model, test_env, report)
     assert report.stress_summary['duration'][1] == timedelta(hours=20)
-    assert round(post_stress_state.curr_prm_vals['current'][0][1][2], 5) == 0.00570
+    assert round(phys_state.curr_prm_vals['current'][0][1][2], 5) == 0.00570
 
 
 def test_sim_meas_step_basic(sequential_var):
@@ -87,11 +88,11 @@ def test_sim_meas_step_basic(sequential_var):
 
     def cond_eqn(temp, c):
         return c - (1e-4*(temp - 25))
-    sim_model = DeviceModel(
-        DegradedParamModel(DegMechModel(dummy_eqn, mdl_name='dummy'),
-                           InitValModel(init_val=LatentVar(deter_val=4e-2, dev_vrtn_mdl=sequential_var(1, 1e-2),
+    sim_model = DeviceMdl(
+        DegPrmMdl(DegMechMdl(dummy_eqn, mdl_name='dummy'),
+                           InitValMdl(init_val=LatentVar(deter_val=4e-2, dev_vrtn_mdl=sequential_var(1, 1e-2),
                                                            vrtn_type='offset')),
-                           CondShiftModel(cond_eqn, c=LatentVar(deter_val=1e-2,
+                           CondShiftMdl(cond_eqn, c=LatentVar(deter_val=1e-2,
                                                                 dev_vrtn_mdl=sequential_var(0, 1e-3),
                                                                 vrtn_type='offset')),
                            prm_name='current'))
@@ -118,10 +119,10 @@ def test_wearout_test_sim_basic():
                     num_chps=3, num_lots=2)
 
     def log_deg(scale_factor, temp, time): return scale_factor * np.log(temp * time)
-    deg_model = DeviceModel(DegradedParamModel(
-        DegMechModel(log_deg, scale_factor=LatentVar(deter_val=1e-4, chp_vrtn_mdl=Normal(1, 2e-4, test_seed=777)),
+    deg_model = DeviceMdl(DegPrmMdl(
+        DegMechMdl(log_deg, scale_factor=LatentVar(deter_val=1e-4, chp_vrtn_mdl=Normal(1, 2e-4, test_seed=777)),
                      mdl_name='test_mech'),
-        InitValModel(init_val=LatentVar(deter_val=4e-3, dev_vrtn_mdl=Normal(0, 2e-3, test_seed=666),
+        InitValMdl(init_val=LatentVar(deter_val=4e-3, dev_vrtn_mdl=Normal(0, 2e-3, test_seed=666),
                                         vrtn_type='offset')),
         prm_name='current'))
 
@@ -204,9 +205,9 @@ def test_vts_paper_example_1():
         r_o = (v_e * l) / i_d_2
         return g_m * r_o
 
-    dev_mdl = DeviceModel({'v_th': DegradedParamModel(
+    dev_mdl = DeviceMdl({'v_th': DegPrmMdl(
         deg_mech_mdls={
-            'bti': DegMechModel(
+            'bti': DegMechMdl(
                 bti_vth_shift_empirical,
                 a_0=LatentVar(deter_val=0.006, dev_vrtn_mdl=Normal(1, 0.0005, test_seed=678)),
                 e_aa=LatentVar(deter_val=-0.05, dev_vrtn_mdl=Normal(1, 0.0002, test_seed=789),
@@ -215,7 +216,7 @@ def test_vts_paper_example_1():
                 alpha=LatentVar(deter_val=9.5, dev_vrtn_mdl=Normal(1, 0.002, test_seed=987),
                                 chp_vrtn_mdl=Normal(1, 0.005, test_seed=876)),
                 n=LatentVar(deter_val=0.4, dev_vrtn_mdl=Normal(1, 0.0005, test_seed=765))),
-            'hci': DegMechModel(
+            'hci': DegMechMdl(
                 hci_vth_shift_empirical,
                 a_0=LatentVar(deter_val=0.1, dev_vrtn_mdl=Normal(1, 0.004, test_seed=654)),
                 n=LatentVar(deter_val=0.62, dev_vrtn_mdl=Normal(1, 0.003, test_seed=543)),
@@ -226,16 +227,18 @@ def test_vts_paper_example_1():
                                lot_vrtn_mdl=Normal(1, 0.01, test_seed=357)),
                 t_0=LatentVar(deter_val=500, dev_vrtn_mdl=Normal(1, 0.001, test_seed=468))
             )},
-        init_val_mdl=InitValModel(init_val=LatentVar(
+        init_val_mdl=InitValMdl(init_val=LatentVar(
             deter_val=0.42, dev_vrtn_mdl=Normal(0, 0.0001, test_seed=579), chp_vrtn_mdl=Normal(0, 0.0002, test_seed=680),
             lot_vrtn_mdl=Normal(0, 0.0003, test_seed=791), vrtn_type='offset')),
         compute_eqn=v_th_eqn
-    ), 'amp_gain': CircuitParamModel(
+    ), 'amp_gain': CircPrmMdl(
         amp_gain_eqn, u_n=LatentVar(deter_val=1), c_ox=LatentVar(deter_val=1), w=LatentVar(deter_val=8), l=LatentVar(deter_val=2), v_e=LatentVar(deter_val=5))})
 
     ### 4. Simulate the stress tests at different temperatures ###
     test_list = ['CP:RC', 'CP:HTOL', 'CP:LTOL', 'NP:RC', 'NP:HTOL', 'NP:LTOL']
     results = {}
+
+    start = time.process_time()
     # First simulate the expected results for the current generation of products
     results[test_list[0]] = gerabaldi.simulate(ramp_failure_test, dev_mdl, test_env)
     results[test_list[1]] = gerabaldi.simulate(htol_test, dev_mdl, test_env)
@@ -247,6 +250,8 @@ def test_vts_paper_example_1():
     results[test_list[3]] = gerabaldi.simulate(ramp_failure_test, dev_mdl, test_env)
     results[test_list[4]] = gerabaldi.simulate(htol_test, dev_mdl, test_env)
     results[test_list[5]] = gerabaldi.simulate(ltol_test, dev_mdl, test_env)
+    end = time.process_time()
+    print(f"Simulation time: {end - start}")
 
     # Now validate a few of the results to ensure reproducibility
     assert round(results['CP:HTOL'].measurements.loc[11]['measured'], 2) == 28.24
@@ -281,15 +286,15 @@ def test_vts_paper_example_2():
         return 0 if conductive_col or init == 0 else 1
 
     def single_test(step_val, test, env):
-        defect_mdl = FailMechModel(defect_generator_demo_model,
+        defect_mdl = FailMechMdl(defect_generator_demo_model,
                                    c=LatentVar(deter_val=1e-3),
                                    t_diel=LatentVar(deter_val=3),
                                    bond_strength=LatentVar(deter_val=200),
                                    thermal_dist=LatentVar(deter_val=step_val))
         defect_dict = {'defect' + str(i): defect_mdl for i in range(0, 12)}
-        tddb_model = DeviceModel(DegradedParamModel(
+        tddb_model = DeviceMdl(DegPrmMdl(
             prm_name='tddb',
-            init_val_mdl=InitValModel(init_val=LatentVar(deter_val=1)),
+            init_val_mdl=InitValMdl(init_val=LatentVar(deter_val=1)),
             deg_mech_mdls=defect_dict,
             compute_eqn=oxide_failed,
             array_computable=False,

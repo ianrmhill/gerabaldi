@@ -108,9 +108,9 @@ def test_physical_test_environment(sequential_var):
     def hci_func(time, a, y):
         return (time / a) * y
 
-    dev_mdl = DeviceModel({
-        'bti': DegradedParamModel(DegMechModel(bti_func, mdl_name='deg'), cond_shift_mdl=CondShiftModel(cond_func)),
-        'hci': DegradedParamModel(DegMechModel(hci_func, mdl_name='deg2'))})
+    dev_mdl = DeviceMdl({
+        'bti': DegPrmMdl(DegMechMdl(bti_func, mdl_name='deg'), cond_shift_mdl=CondShiftMdl(cond_func)),
+        'hci': DegPrmMdl(DegMechMdl(hci_func, mdl_name='deg2'))})
     test_spec = TestSpec([MeasSpec({'bti': 2, 'hci': 3, 'b': 2}, {'a': 13, 'b': 7})], num_chps=2, num_lots=1)
     report = TestSimReport(test_spec)
     env_conds = env.gen_env_cond_vals({'a': 4, 'b': 10}, ['bti', 'hci'], report, dev_mdl)

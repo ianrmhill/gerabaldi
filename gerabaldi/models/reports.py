@@ -7,7 +7,7 @@ import pandas as pd
 import numpy as np
 from datetime import timedelta
 
-from gerabaldi.models.devices import DeviceModel
+from gerabaldi.models.devices import DeviceMdl
 from gerabaldi.models.testspecs import TestSpec
 from gerabaldi.exceptions import ArgOverwriteWarning
 
