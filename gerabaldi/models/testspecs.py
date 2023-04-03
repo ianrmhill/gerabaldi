@@ -25,7 +25,7 @@ class StrsSpec:
     def __init__(self, conditions: dict, duration: timedelta | int | float, name: str = 'unspecified'):
         self.conditions = conditions
         # Currently, test lengths use units of hours, but are provided as timedelta objects
-        if type(duration) == int:
+        if type(duration) in [int, float]:
             duration = timedelta(hours=duration)
         # Ensure the duration of the stress phase/cell is not 0
         if duration == timedelta():

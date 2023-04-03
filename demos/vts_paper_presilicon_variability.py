@@ -40,7 +40,7 @@ def simulate(save_files: dict = None):
     """
 
     ########################################################################
-    ### 1. Define the tests to simulate                                   ###
+    ### 1. Define the tests to simulate                                  ###
     ########################################################################
     full_meas = MeasSpec({'amp_gain': NUM_SAMPLES}, {'temp': 30 + CELSIUS_TO_KELVIN, 'vdd': 0.86}, 'Measure All')
 
@@ -97,15 +97,15 @@ def simulate(save_files: dict = None):
         r_o = (v_e * l) / i_d_2
         return g_m * r_o
 
-    dev_mdl = DeviceModel({'v_th': DegradedParamModel(
+    dev_mdl = DeviceMdl({'v_th': DegPrmMdl(
         deg_mech_mdls={
-            'bti': DegMechModel(
+            'bti': DegMechMdl(
                 bti_vth_shift_empirical,
                 a_0=LatentVar(Normal(0.006, 0.0005)),
                 e_aa=LatentVar(Normal(-0.05, 0.0002), chp_vrtn_mdl=Normal(1, 0.0003), lot_vrtn_mdl=Normal(1, 0.0001)),
                 alpha=LatentVar(Normal(9.5, 0.002), chp_vrtn_mdl=Normal(1, 0.005)),
                 n=LatentVar(Normal(0.4, 0.0005))),
-            'hci': DegMechModel(
+            'hci': DegMechMdl(
                 hci_vth_shift_empirical,
                 a_0=LatentVar(Normal(0.1, 0.004)),
                 n=LatentVar(Normal(0.62, 0.003)),
@@ -113,10 +113,10 @@ def simulate(save_files: dict = None):
                 beta=LatentVar(Normal(1.1, 0.002), chp_vrtn_mdl=Normal(1, 0.001), lot_vrtn_mdl=Normal(1, 0.01)),
                 t_0=LatentVar(Normal(500, 0.001))
             )},
-        init_val_mdl=InitValModel(init_val=LatentVar(
+        init_val_mdl=InitValMdl(init_val=LatentVar(
             Normal(0.42, 0.0001), chp_vrtn_mdl=Normal(0, 0.0002), lot_vrtn_mdl=Normal(0, 0.0003), vrtn_type='offset')),
         compute_eqn=v_th_eqn
-    ), 'amp_gain': CircuitParamModel(
+    ), 'amp_gain': CircPrmMdl(
         amp_gain_eqn,
         u_n=LatentVar(deter_val=1),
         c_ox=LatentVar(deter_val=1),

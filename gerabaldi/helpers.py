@@ -51,7 +51,7 @@ def _get_single_index(vals: dict, i: int, j: int, k: int) -> dict:
             new[key] = _get_single_index(vals[key], i, j, k)
         elif type(val) in [np.ndarray, list]:
             new[key] = val[i][j][k]
-        elif type(val) in [int, float, np.float64]:
+        elif type(val) in [int, float, np.float64, tuple]:
             new[key] = val
     return new
 

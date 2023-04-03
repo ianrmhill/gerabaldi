@@ -68,14 +68,14 @@ def simulate(save_file: str = None):
     def riverbed_level(init, erosion, cond):
         return init - erosion + cond
 
-    river_mdl = DeviceModel(DegradedParamModel(
+    river_mdl = DeviceMdl(DegPrmMdl(
         prm_name='riverbed_level',
         deg_mech_mdls={
-            'erosion': DegMechModel(
+            'erosion': DegMechMdl(
                 fluvial_erosion_riverbed, k_d=LatentVar(deter_val=1e-5),
                 tau_c=LatentVar(Normal(2.4, 0.02), Normal(1, 0.2)), alpha=LatentVar(Normal(0.9, 0.01), Normal(1, 0.04)),
             )},
-        init_val_mdl=InitValModel(init_val=LatentVar(dev_vrtn_mdl=Normal(-2, 0.01), chp_vrtn_mdl=Normal(1, 0.02))),
+        init_val_mdl=InitValMdl(init_val=LatentVar(dev_vrtn_mdl=Normal(-2, 0.01), chp_vrtn_mdl=Normal(1, 0.02))),
         compute_eqn=riverbed_level,
         array_computable=False
     ))

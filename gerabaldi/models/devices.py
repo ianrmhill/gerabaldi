@@ -150,6 +150,7 @@ class LatentMdl:
         if not mdl_eqn:
             def mdl_eqn(x): return x
         self.compute = mdl_eqn
+        self.compute_args = inspect.signature(self.compute).parameters.keys()
         # Define 'true'/underlying values for equation inputs used to simulate degradation
         # No latent variable values should be specified when performing model inference
         self.latent_vars = []
@@ -205,86 +206,97 @@ class MechMdl(LatentMdl):
     def gen_init_vals(self, num_devs, num_chps, num_lots):
         return np.full((num_lots, num_chps, num_devs), self.unitary)
 
-    def calc_equiv_strs_time(self, deg_val, strs_conds, init_val, latents):
+    def calc_equiv_strs_time(self, deg_val, init_val, strs_conds, latents, dims):
         raise NotImplementedError('Mechanism does not define how to compute value changes under time-varying stress')
 
-    def calc_deg_vals(self, times, strs, init, latents, dims):
+    def calc_deg_vals(self, times: np.ndarray, pre_deg_vals: np.ndarray,
+                      strs_conds: dict, latents: dict, dims: tuple) -> np.ndarray:
         """
         Calculate the underlying degraded values for the parameter given a set of stress conditions and stress duration.
         Note that this method does not calculate a measured value, only the 'true' underlying degraded parameter value.
         """
-        mech_sig = inspect.signature(self.compute)
+        # To support degradation mechanisms that exhibit threshold behaviours, we first identify whether some samples
+        # won't degrade under the current stress conditions based on the failure to find a valid equivalent stress time
+        no_deg_mask = np.where(times > 9e9, pre_deg_vals, np.inf)
+
         # Add the stress time to the argument dict
         arg_vals = {'time': times}
-
         # Add all stress conditions, latent variables, and potentially initial values to the argument list
-        for arg in mech_sig.parameters.keys():
+        for arg in self.compute_args:
             if arg in latents:
                 arg_vals[arg] = latents[arg]
-            elif arg in strs:
-                arg_vals[arg] = strs[arg]
-            elif arg == 'init':
-                arg_vals[arg] = init[arg]
-        return self.compute(**arg_vals)
-
-        mech_sig = inspect.signature(self.mech_mdl(mech).compute)
-        # Add the stress time to the argument dict
-        arg_vals[mech] = {'time': times[mech]}
-        # Add all stress condition values to the already well formatted latents dict
-        for arg in mech_sig.parameters.keys():
-            if arg in latents[mech]:
-                arg_vals[mech][arg] = latents[mech][arg]
             elif arg in strs_conds:
-                arg_vals[mech][arg] = strs_conds[arg]
-        arg_vals[mech] = self.mech_mdl(mech).compute(**arg_vals[mech])
+                arg_vals[arg] = strs_conds[arg]
+        # Calculate the degradation for all samples
+        try:
+            deg_vals = self.compute(**arg_vals)
+        except ValueError:
+            deg_vals = loop_compute(self.compute, arg_vals, dims)
+
+        # Overwrite the calculated degradation for the samples that we knew wouldn't degrade to the previous values
+        # Note that we do a little extra work here as deg_vals is still computed for the non-degrading samples, but this
+        # allows for array computation. TODO: numpy masking computation
+        return np.where(no_deg_mask == np.inf, deg_vals, no_deg_mask)
+
+    def calc_deg_vals_lite(self, time: int | float, conds: dict, ltnts: dict) -> float:
+        arg_vals = {'time': time}
+        for arg in self.compute_args:
+            if arg in ltnts:
+                arg_vals[arg] = ltnts[arg]
+            elif arg in conds:
+                arg_vals[arg] = conds[arg]
+        # Calculate the degradation for the sample
+        return self.compute(**arg_vals)
 
 
 class DegMechMdl(MechMdl):
     """Class for modelling the effect of a degradation mechanism on some physical parameter."""
-    def calc_equiv_strs_time(self, deg_val, strs_conds, init_val, latents):
+    def calc_equiv_strs_time(self, deg_val: int | float, init_val: int | float,
+                             strs_conds: dict, latents: dict, dims: tuple) -> float:
         """
         This method back-calculates the length of time required to reach the current level of degradation under a given
         set of stress conditions for all the different samples in the test.
         """
         # Computes the absolute difference between the target value and the calculated value using a given time
-        def residue(time, val, strs, init, prm_latents):
-            return abs(val - self.calc_deg_vals(time, strs, init, prm_latents))
+        def residue(time, curr_deg_val, conds, ltnts):
+            return abs(curr_deg_val - self.calc_deg_vals_lite(time, conds, ltnts))
 
         # Minimize the difference between the output and the target/observed value using scipy optimizer
         # Since we are minimizing time we use the bounded method to ensure our time doesn't go negative
-        return minimize_scalar(residue, args=(deg_val, strs_conds, init_val, latents),
+        return minimize_scalar(residue, args=(deg_val, strs_conds, latents),
                                method='bounded', bounds=(0, 1e10)).x
 
 
 class FailMechMdl(MechMdl):
     """Class for modelling the effect of a time-independent hard failure mechanism on some physical parameter."""
-    def calc_equiv_strs_time(self, deg_val, strs_conds, init_val, latents):
+    def calc_equiv_strs_time(self, deg_val: int | float, init_val: int | float,
+                             strs_conds: dict, latents: dict, dims: tuple) -> float:
         """
         Equivalent method with degradation mechanisms, except here we just return whether the failure has occurred.
 
         Parameters
         ----------
         deg_val
-        strs_conds
         init_val
+        strs_conds
         latents
+        dims
 
         Returns
         -------
 
         """
-        # There is no equivalent stress time as the failure mechanism is time-independent
-        return 0
+        # No equivalent stress time as hard failure mechanisms (no underlying degradation) are time-independent
+        return 0.0
 
-    def calc_deg_vals(self, times, strs, init, latents):
+    def calc_deg_vals(self, times: np.ndarray, pre_deg_vals: np.ndarray,
+                      strs_conds: dict, latents: dict, dims: tuple) -> np.ndarray:
         """
         Calculate the failure state for the mechanism given a set of stress conditions and stress duration.
         """
         # Once the state has failed (i.e., unitary is the initial/unfailed state) the mechanism remains failed
-        if init != self.unitary:
-            return init
-        else:
-            super().calc_deg_vals(times, strs, init, latents)
+        return np.where(pre_deg_vals != self.unitary, pre_deg_vals,
+                        super().calc_deg_vals(times, pre_deg_vals, strs_conds, latents, dims))
 
 
 class CondShiftMdl(LatentMdl):
@@ -298,18 +310,16 @@ class CondShiftMdl(LatentMdl):
         super().__init__(cond_shift_eqn, mdl_name, **latent_vars)
 
     def calc_cond_vals(self, conds: dict, latents: dict, dims: tuple) -> np.ndarray:
-        # First calculate the conditional shift model value
-        cond_sig = inspect.signature(self.compute)
         # Add all stress condition values to the already well formatted latents dict
         arg_vals = {}
-        for arg in cond_sig.parameters.keys():
+        for arg in self.compute_args:
             if arg in latents:
                 arg_vals[arg] = latents[arg]
             elif arg in conds:
                 arg_vals[arg] = conds[arg]
         try:
             return self.compute(**arg_vals)
-        except TypeError:
+        except ValueError:
             return loop_compute(self.compute, arg_vals, dims)
 
 
@@ -437,38 +447,6 @@ class DegPrmMdl(LatentMdl):
             init_mech_vals[mech] = self.mech_mdl(mech).gen_init_vals(num_devs, num_chps, num_lots)
         return init_mech_vals
 
-    def _set_to_single_index(self, vals: dict, i: int, j: int, k: int) -> dict:
-        """
-        Recursive method that obtains a single item index from a 3D list or ndarray. Takes a nested dictionary structure
-        that may have arbitrarily many 3D arrays of the same shape, and substitutes the arrays with the value stored in
-        the specified index location within the respective arrays.
-
-        Parameters
-        ----------
-        vals: dict
-            The nested dictionary structure containing any number of arrays of shape (i, j, k)
-        i: int
-            The first dimension index for the item to extract from the arrays.
-        j: int
-            The second dimension index for the item to extract from the arrays.
-        k: int
-            The third dimension index for the item to extract from the arrays.
-
-        Returns
-        -------
-        new: dict
-            The nested dictionary with all arrays replaced with respective values from the specified index location.
-        """
-        new = {}
-        for key, val in vals.items():
-            if type(val) == dict:
-                new[key] = self._set_to_single_index(vals[key], i, j, k)
-            elif type(val) in [np.ndarray, list]:
-                new[key] = val[i][j][k]
-            elif type(val) in [int, float, np.float64]:
-                new[key] = val
-        return new
-
     def _reduce_dev_dim_size(self, vals: dict, reduced_size: int) -> dict:
         new = {}
         for key, val in vals.items():
@@ -478,7 +456,7 @@ class DegPrmMdl(LatentMdl):
                 new[key] = self._reduce_dev_dim_size(vals[key], reduced_size)
         return new
 
-    def calc_equiv_strs_times(self, meas_dims: tuple, mech_deg_vals: dict, strs_conds: dict,
+    def calc_equiv_strs_times(self, strs_dims: tuple, mech_deg_vals: dict, strs_conds: dict,
                               init_vals: dict, latents: dict) -> dict:
         """
         This method back-calculates the length of time required to reach the passed output value given the other test
@@ -503,11 +481,13 @@ class DegPrmMdl(LatentMdl):
         equiv_times = {}
         for mech in self.mech_mdl_list:
             args_dict = {'deg_val': mech_deg_vals[mech], 'init_val': init_vals[mech],
-                         'strs_conds': strs_conds, 'latents': latents[mech]}
-            equiv_times[mech] = loop_compute(self.mech_mdl(mech).calc_equiv_strs_time, args_dict, meas_dims)
+                         'strs_conds': strs_conds, 'latents': latents[mech], 'dims': strs_dims}
+            # Currently we always loop compute because the numerical method used to calculate equivalent stress time
+            # from the SciPy library is not array computable
+            equiv_times[mech] = loop_compute(self.mech_mdl(mech).calc_equiv_strs_time, args_dict, strs_dims)
         return equiv_times
 
-    def calc_degraded_vals(self, meas_dims: tuple, times: dict, strs_conds: dict,
+    def calc_deg_vals(self, strs_dims: tuple, times: dict, strs_conds: dict,
                            init_vals: np.ndarray, latents: dict, deg_vals: dict) -> (np.ndarray, dict):
         """
         Calculate the underlying degraded values for the parameter given a set of stress conditions and stress duration.
@@ -534,63 +514,24 @@ class DegPrmMdl(LatentMdl):
         # shift model leaves the base value unchanged
         arg_vals = {'init': init_vals, 'cond': self.cond_mdl.unitary}
 
-        # First calculate the mechanism shift model values
+        # Calculate the degradation for the mechanism models
         mech_vals = {}
         for mech in self.mech_mdl_list:
-            mech_vals[mech] = self.mech_mdl(mech).calc_deg_vals()
+            mech_vals[mech] = self.mech_mdl(mech).calc_deg_vals(times[mech], deg_vals[mech], strs_conds, latents[mech], strs_dims)
             # Also copy the mechanism degraded vals into the arguments data structure for computing the parameters
             arg_vals[mech] = mech_vals[mech]
+
+        # Finally add the parameter equation's latent values
+        for arg in self.compute_args:
+            if arg not in arg_vals.keys() and arg in latents:
+                arg_vals[arg] = latents[arg]
 
         # Now compute the parameter values using all the calculated mechanism and conditional shift values
         try:
             prm_vals = self.compute(**arg_vals)
         except ValueError:
-            prm_vals = loop_compute(self.compute, arg_vals, meas_dims)
+            prm_vals = loop_compute(self.compute, arg_vals, strs_dims)
         return prm_vals, mech_vals
-
-    def calc_degraded_val(self, time, strs_conds, init_val, latents, deg_val):
-        arg_vals = {}
-        mech_val = {}
-
-        for mech in self.mech_mdl_list:
-            arg_vals[mech] = {}
-            # This if case handles hard failure mechanisms
-            if type(self.mech_mdl(mech)) == FailMechMdl and deg_val[mech] != self.mech_mdl(mech).unitary:
-                # If the sample has already failed, leave it failed
-                arg_vals[mech] = deg_val[mech]
-                mech_val[mech] = deg_val[mech]
-            # This case handles mechanisms that can hit 0 or negative degradation rates during a stress phase
-            # (e.g. recovery) THIS NEEDS TO BE CHANGED TO ADD RECOVERY SUPPORT
-            # The comparison checks if the equivalent time needed to reach the current level of degradation is
-            # effectively infinite, we just bounded the equivalent time calculation
-            elif time[mech] > 9e9:
-                arg_vals[mech] = deg_val[mech]
-                mech_val[mech] = deg_val[mech]
-            # This case handles standard degradation cases
-            else:
-                arg_vals[mech]['time'] = time[mech]
-                mech_sig = inspect.signature(self.mech_mdl(mech).compute)
-                # Add all stress condition values to the already well formatted latents dict
-                for arg in mech_sig.parameters.keys():
-                    if arg in latents[mech]:
-                        arg_vals[mech][arg] = latents[mech][arg]
-                    elif arg in strs_conds:
-                        arg_vals[mech][arg] = strs_conds[arg]
-                arg_vals[mech] = self.mech_mdl(mech).compute(**arg_vals[mech])
-                # Also copy the mechanism degraded vals into the persistence data structure
-                mech_val[mech] = arg_vals[mech]
-
-        arg_vals['cond'] = self.cond_mdl.unitary
-        arg_vals['init'] = init_val
-
-        # Finally add the parameter equation's latent values
-        prm_sig = inspect.signature(self.compute)
-        for arg in prm_sig.parameters.keys():
-            if arg not in arg_vals.keys() and arg in latents:
-                arg_vals[arg] = latents[arg]
-
-        prm_val = self.compute(**arg_vals)
-        return prm_val, mech_val
 
     def calc_cond_shifted_vals(self, meas_dims: tuple, conds: dict, deg_vals: np.ndarray, latents: dict) -> np.ndarray:
         """
@@ -628,14 +569,11 @@ class DegPrmMdl(LatentMdl):
             arg_vals[mech] = self.mech_mdl(mech).unitary
 
         # Next are the parameter's own latent values
-        prm_sig = inspect.signature(self.compute)
-        for arg in prm_sig.parameters.keys():
+        for arg in self.compute_args:
             if arg not in arg_vals.keys() and arg in latents:
                 arg_vals[arg] = latents[arg]
 
         # Now compute the parameter values
-        # TODO: This may be the more pythonic way, but I'm worried catching exceptions every time we compute is slow.
-        #       Could instead try once then use the array_computable flag???
         try:
             return self.compute(**arg_vals)
         except ValueError:
@@ -643,16 +581,13 @@ class DegPrmMdl(LatentMdl):
 
     def get_dependencies(self, conditions, target):
         # Typically no environmental conditions will be used in the parameter compute function, but check just in case
-        all_args = inspect.signature(self.compute)
-        depends_conds = [arg for arg in all_args.parameters.keys() if arg in conditions]
+        depends_conds = [arg for arg in self.compute_args if arg in conditions]
         # Only want the dependencies that affect either a stress phase or a measurement
         if target == 'stress':
             for mech in self.mech_mdl_list:
-                all_args = inspect.signature(self.mech_mdl(mech).compute)
-                depends_conds.extend([arg for arg in all_args.parameters.keys() if arg in conditions])
+                depends_conds.extend([arg for arg in self.mech_mdl(mech).compute_args if arg in conditions])
         else:
-            all_args = inspect.signature(self.cond_mdl.compute)
-            depends_conds.extend([arg for arg in all_args.parameters.keys() if arg in conditions])
+            depends_conds.extend([arg for arg in self.cond_mdl.compute_args if arg in conditions])
         # There is a chance to have overlapping environmental condition dependencies, so remove any duplicates
         return [*set(depends_conds)]
 
@@ -665,8 +600,7 @@ class CircPrmMdl(LatentMdl):
     def calc_circ_vals(self, num_samples, strs_conds, degraded_prm_vals, latents) -> np.ndarray:
         arg_vals = {}
 
-        circ_sig = inspect.signature(self.compute)
-        for arg in circ_sig.parameters.keys():
+        for arg in self.compute_args:
             if arg in latents:
                 arg_vals[arg] = latents[arg]
             elif arg in strs_conds:
@@ -679,14 +613,12 @@ class CircPrmMdl(LatentMdl):
 
     def get_required_prms(self, mdl_prm_list):
         # Determine which of the list of parameters are used to compute the value of this circuit parameter
-        circ_sig = inspect.signature(self.compute)
-        return [prm for prm in mdl_prm_list if prm in circ_sig.parameters.keys()]
+        return [prm for prm in mdl_prm_list if prm in self.compute_args]
 
     def get_dependencies(self, conditions, target):
         # Note that 'target' is an unused argument here, but needs to be kept to match the signature of get_dependencies
         # for the DegPrmMdl class
-        all_args = inspect.signature(self.compute)
-        return [arg for arg in all_args.parameters.keys() if arg in conditions]
+        return [arg for arg in self.compute_args if arg in conditions]
 
 
 class DeviceMdl:

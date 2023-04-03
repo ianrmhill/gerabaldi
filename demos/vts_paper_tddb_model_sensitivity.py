@@ -31,7 +31,8 @@ NUM_SAMPLES = 1000
 
 
 def defect_generator_demo_model(time, temp, v_g, t_diel, c, bond_strength, thermal_dist):
-    """We follow the suggestion in ___ that the probability of a defect forming is time-independent."""
+    """A toy time-independent defect formation model that includes temperature and voltage dependence. Not a proposed
+    TDDB defect formation model."""
     defect_gen_prob = c * (v_g / t_diel) * ((temp ** thermal_dist) / bond_strength)
     prob = time * defect_gen_prob
     return 1 if Uniform().sample() < prob else 0
@@ -68,18 +69,18 @@ def single_test(step_val, test):
     ########################################################################
     ### 3. Define the physical device model                              ###
     ########################################################################
-    defect_mdl = FailMechModel(defect_generator_demo_model,
+    defect_mdl = FailMechMdl(defect_generator_demo_model,
                                c=LatentVar(deter_val=4e-6),
                                t_diel=LatentVar(deter_val=3),
                                bond_strength=LatentVar(deter_val=200),
                                thermal_dist=LatentVar(deter_val=step_val))  # <-- This is what we are schmooing
     defect_dict = {'defect' + str(i): defect_mdl for i in range(0, 12)}
 
-    tddb_model = DeviceModel(DegradedParamModel(
+    tddb_model = DeviceMdl(DegPrmMdl(
         prm_name='tddb',
         # We set the initial state to be where all transistor oxides are unbroken,
         # however we could model manufacturing defects by modifying this
-        init_val_mdl=InitValModel(init_val=LatentVar(deter_val=1)),
+        init_val_mdl=InitValMdl(init_val=LatentVar(deter_val=1)),
         deg_mech_mdls=defect_dict,
         compute_eqn=oxide_failed,
         array_computable=False,

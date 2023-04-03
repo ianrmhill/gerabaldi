@@ -45,9 +45,9 @@ def simulate(save_file: str = None):
     ########################################################################
     def ex_eqn(time, temp, a):
         return time * -a * temp
-    dev_mdl = DeviceModel(
-        {'example': DegradedParamModel(
-            {'linear': DegMechModel(ex_eqn, a=LatentVar(Normal(1e-3, 2e-4)))})})
+    dev_mdl = DeviceMdl(
+        {'example': DegPrmMdl(
+            {'linear': DegMechMdl(ex_eqn, a=LatentVar(Normal(1e-3, 2e-4)))})})
 
     ########################################################################
     ### 4. Simulate the test                                             ###

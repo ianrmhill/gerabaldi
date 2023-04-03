@@ -95,7 +95,7 @@ def test_conditional_shift_model(sequential_var):
     # TODO: Add calc_cond_vals testing
 
 
-def test_deg_mech_model_basic():
+def test_deg_mech_mdl():
     """Bare-bones tests for the MechModel class."""
     def basic_eqn(time, y, z): return time * y * z
     basic_model = DegMechMdl(basic_eqn, x=LatentVar(deter_val=3), y=LatentVar(deter_val=2))
@@ -109,10 +109,21 @@ def test_deg_mech_model_basic():
 
     # Next test that the equivalent time back-calculation is working correctly
     latents = {'z': 0.5}
-    assert round(basic_model.calc_equiv_strs_time(8, {'y': 4, 'unused': 3}, 0, latents), 4) == 4
+    assert round(basic_model.calc_equiv_strs_time(8, 0, {'y': 4, 'unused': 3}, latents, (1, 1, 1)), 4) == 4
 
 
-def test_degraded_param(sequential_var):
+def test_fail_mech_mdl():
+    def fail_eqn(time, temp, a): return 1 if time * temp * a > 10 else 0
+    mdl = FailMechMdl(fail_eqn, a=LatentVar(Deterministic(1)))
+    conds = {'temp': np.array([[[4, 2, 3]]])}
+    ltnts = {'a': np.array([[[1, 0.2, 0.1]]])}
+
+    assert mdl.calc_equiv_strs_time(1, 2, {'temp': 3}, {'a': 4}, (1, 1, 3)) == 0.0
+    assert np.allclose(mdl.calc_deg_vals(np.array([[[3, 4, 5]]]), np.array([[[0, 1, 0]]]), conds, ltnts, (1, 1, 3)),
+                       np.array([[[1, 1, 0]]]))
+
+
+def test_deg_prm_mdl(sequential_var):
     # Test a basic parameter setup
     def degradation(time, temp, a, b): return (time**a) * (temp**b)
     def shift(temp, vdd, a, b): return a * (temp**b) * vdd
@@ -127,14 +138,14 @@ def test_degraded_param(sequential_var):
     init_prm_vals = mdl.init_mdl.gen_init_vals(3)
     init_mech_vals = {'sample_mech': np.zeros((1, 1, 3))}
     conditions = {'temp': [[[25, 26, 30]]], 'vdd': [[[0.5, 0.55, 0.55]]]}
-    prms, mechs = mdl.calc_degraded_vals({'sample_mech': 10}, conditions, init_prm_vals, latents, init_mech_vals)
+    prms, mechs = mdl.calc_deg_vals((1, 1, 3), {'sample_mech': 10}, conditions, init_prm_vals, latents, init_mech_vals)
     assert np.allclose(prms.round(4), [[[28.2031, 50.1494, 98.8683]]])
     prms = mdl.calc_cond_shifted_vals((1, 1, 3), {'temp': 125, 'vdd': 0.6}, np.array([[[28.2031, 50.1494, 98.8683]]]), latents)
     assert np.allclose(prms.round(4), [[[126.6979, 241.7009, 461.0473]]])
 
     # Test that the individual vs. array computation is equivalent
     mdl.array_compute = False
-    prms, mechs = mdl.calc_degraded_vals({'sample_mech': 10}, conditions, init_prm_vals, latents, init_mech_vals)
+    prms, mechs = mdl.calc_deg_vals((1, 1, 3), {'sample_mech': 10}, conditions, init_prm_vals, latents, init_mech_vals)
     assert np.allclose(prms.round(4), [[[28.2031, 50.1494, 98.8683]]])
     prms = mdl.calc_cond_shifted_vals((1, 1, 3), {'temp': 125, 'vdd': 0.6}, np.array([[[28.2031, 50.1494, 98.8683]]]), latents)
     assert np.allclose(prms.round(4), [[[126.6979, 241.7009, 461.0473]]])

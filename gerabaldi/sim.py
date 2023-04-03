@@ -63,14 +63,14 @@ def _sim_stress_step(step: StrsSpec, sim_state: TestSimState, dev_mdl: DeviceMdl
     # 1. Build the stochastically-adjusted set of stress conditions
     # Only need to generate stress conditions for device parameters that degrade, get the list of those parameters
     deg_prm_list = [prm for prm in dev_mdl.prm_mdl_list if type(dev_mdl.prm_mdl(prm)) == DegPrmMdl]
-    cond_vals = test_env.gen_env_cond_vals(step.conditions, deg_prm_list, report, dev_mdl, 'stress')
+    strs_conds = test_env.gen_env_cond_vals(step.conditions, deg_prm_list, report, dev_mdl, 'stress')
 
     for prm in deg_prm_list:
         # 2. Calculate the equivalent stress times that would have been needed under the generated stress conditions to
         # obtain the prior degradation values. First we calculate the equivalent time to reach the current value of degradation
         equiv_times = dev_mdl.prm_mdl(prm).calc_equiv_strs_times(
             (report.num_lots, report.num_chps, report.dev_counts[prm]),
-            sim_state.curr_deg_mech_vals[prm], cond_vals[prm], sim_state.init_deg_mech_vals[prm], sim_state.latent_var_vals[prm])
+            sim_state.curr_deg_mech_vals[prm], strs_conds[prm], sim_state.init_deg_mech_vals[prm], sim_state.latent_var_vals[prm])
         # Now add on the time for the current stress phase
         for mech in equiv_times:
             equiv_times[mech] += step.duration.total_seconds() / SECONDS_PER_HOUR
@@ -78,7 +78,7 @@ def _sim_stress_step(step: StrsSpec, sim_state: TestSimState, dev_mdl: DeviceMdl
         # 3. Simulate the degradation for each device after adding the equivalent prior stress time
         sim_state.curr_prm_vals[prm], sim_state.curr_deg_mech_vals[prm] = dev_mdl.prm_mdl(prm).calc_deg_vals(
             (report.num_lots, report.num_chps, report.dev_counts[prm]),
-            equiv_times, cond_vals[prm], sim_state.init_prm_vals[prm], sim_state.latent_var_vals[prm], sim_state.curr_deg_mech_vals[prm]
+            equiv_times, strs_conds[prm], sim_state.init_prm_vals[prm], sim_state.latent_var_vals[prm], sim_state.curr_deg_mech_vals[prm]
         )
 
     # Update the elapsed real-world test time

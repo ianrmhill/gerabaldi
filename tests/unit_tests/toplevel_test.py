@@ -324,9 +324,9 @@ def test_vts_paper_example_2():
     results = [single_test(step, field_use_sim, field_env) for step in schmoo_list]
 
     # Now check a few values to ensure reproducibility
-    assert results[1].measurements.loc[55]['measured'] == 1.0
-    assert results[1].measurements.loc[65]['measured'] == 0.0
-    assert results[4].measurements.loc[40]['measured'] == 1.0
-    assert results[4].measurements.loc[50]['measured'] == 0.0
+    assert results[1].measurements.loc[65]['measured'] == 1.0
+    assert results[1].measurements.loc[75]['measured'] == 0.0
+    assert results[4].measurements.loc[50]['measured'] == 1.0
+    assert results[4].measurements.loc[60]['measured'] == 0.0
     assert results[3].measurements.loc[33]['measured'] == 1.0
     assert results[3].measurements.loc[43]['measured'] == 0.0
