@@ -6,7 +6,7 @@ from pyrsistent import pmap
 
 from gerabaldi.models.devices import *
 from gerabaldi.models.devices import LatentMdl
-from gerabaldi.models.randomvars import Deterministic
+from gerabaldi.models.random_vars import Deterministic
 from gerabaldi.exceptions import UserConfigError, InvalidTypeError
 
 
@@ -19,8 +19,8 @@ def test_latent_var(sequential_var):
 
     # Now test basic probabilistic definition behaviour
     ltnt = LatentVar(sequential_var(0.2, 0.2))
-    assert (ltnt.chp_vrtn_mdl, ltnt.lot_vrtn_mdl, ltnt.name, ltnt.deter_val, ltnt.vrtn_type) == \
-           (None, None, None, None, 'scaling')
+    assert (type(ltnt.chp_vrtn_mdl), type(ltnt.lot_vrtn_mdl), ltnt.name, ltnt.deter_val, ltnt.vrtn_type) == \
+           (Deterministic, Deterministic, None, None, 'scaling')
     assert ltnt.gen_latent_vals() == np.full((1, 1, 1), 0.2)
     assert np.allclose(ltnt.gen_latent_vals(2, 2, 2), np.array([[[0.2, 0.4], [0.6, 0.8]], [[1.0, 1.2], [1.4, 1.6]]]))
     ltnt = LatentVar(sequential_var(1, 1), sequential_var(1, 1), sequential_var(1, 1))
@@ -28,8 +28,8 @@ def test_latent_var(sequential_var):
 
     # Next test basic deterministic behaviour
     ltnt = LatentVar(deter_val=2)
-    assert (ltnt.dev_vrtn_mdl, ltnt.chp_vrtn_mdl, ltnt.lot_vrtn_mdl, ltnt.name, ltnt.deter_val, ltnt.vrtn_type) == \
-           (None, None, None, None, 2, 'scaling')
+    assert (type(ltnt.dev_vrtn_mdl), type(ltnt.chp_vrtn_mdl), type(ltnt.lot_vrtn_mdl), ltnt.name, ltnt.deter_val, ltnt.vrtn_type) == \
+           (Deterministic, Deterministic, Deterministic, None, 2, 'scaling')
     assert ltnt.gen_latent_vals() == np.full((1, 1, 1), 2)
     ltnt = LatentVar(deter_val=0, chp_vrtn_mdl=sequential_var(1, 1), vrtn_type='offset')
     assert np.allclose(ltnt.gen_latent_vals(1, 2, 1), np.array([[[1], [2]]]))
@@ -59,8 +59,8 @@ def test_latent_mdl(sequential_var):
 
 def test_init_val_mdl_basic(sequential_var):
     mdl = InitValMdl(init_val=LatentVar(deter_val=3))
-    assert (mdl.latent_var('init_val').dev_vrtn_mdl, mdl.latent_var('init_val').chp_vrtn_mdl) == \
-           (None, None)
+    assert (type(mdl.latent_var('init_val').dev_vrtn_mdl), type(mdl.latent_var('init_val').chp_vrtn_mdl)) == \
+           (Deterministic, Deterministic)
     assert mdl.name is None
     assert np.allclose(np.full(8, 3).reshape((2, 2, 2)), mdl.gen_init_vals(2, 2, 2))
 

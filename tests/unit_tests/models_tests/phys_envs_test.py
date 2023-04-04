@@ -18,7 +18,7 @@ def test_measurement_device():
     assert np.array_equal(dev.measure(np.array([4, 6.3])), np.array([4, 6.3]))
     assert dev.measure(pd.Series([-1, 5.2])).equals(pd.Series([-1, 5.2]))
     # Now test the unideal aspects
-    dev = MeasInstrument('For Testing', 3, Gamma(0.5, 2, test_seed=3985), (0, 4))
+    dev = MeasInstrument('For Testing', 3, Gamma(0.5, 0.5, test_seed=3985), (0, 4))
     assert dev.name == 'For Testing'
     assert np.array_equal(dev.measure(np.array([-2.4, 1, 1.2345, 6, 3])), np.array([0, 2.58, 1.93, 4, 3.13]))
     # Finally, test the miserable values to handle in the fancy significant figures math
@@ -84,7 +84,7 @@ def test_physical_test_environment(sequential_var):
 
     # Now test non-defaults model and instrument use
     env = PhysTestEnv({'a': EnvVrtnMdl(dev_vrtn_mdl=Normal(0, 2, test_seed=5746)),
-                       'b': EnvVrtnMdl(dev_vrtn_mdl=Gamma(1, 3, test_seed=4635))},
+                       'b': EnvVrtnMdl(dev_vrtn_mdl=Gamma(1, 1/3, test_seed=4635))},
                       {'b': MeasInstrument(precision=2)}, 'Test Env')
     assert env.name == 'Test Env'
     assert env.meas_instm('b').measure(4.3674) == 4.4

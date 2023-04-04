@@ -1,25 +1,39 @@
+# Copyright (c) 2023 Ian Hill
+# SPDX-License-Identifier: Apache-2.0
+
 """Internal helper functions used within Gerabaldi to streamline the package."""
 
 import importlib
 import numpy as np
+import pandas as pd
+from datetime import timedelta
+
+
+def _convert_time(time, units, **kwargs): # noqa: UnusedParameter
+    """Helper function compatible with pandas apply() function for converting between time representations."""
+    if type(time) in [timedelta, pd.Timedelta]:
+        return time.total_seconds() / units
+    else:
+        return timedelta(**{units: time})
 
 
 def _on_demand_import(module: str, pypi_name: str = None):
     try:
         mod = importlib.import_module(module)
         return mod
-    except ImportError as e:
+    except ImportError:
         # Module name and pypi package name do not always match, we want to tell the user the package to install
         if not pypi_name:
             pypi_name = module
         hint = f"Trying to use a feature that requires the optional {module} module. " \
                f"Please install package '{pypi_name}' first."
 
-        class FailedImport():
+        class FailedImport:
             """By returning a class that raises an error when used, we can try to import modules at the top of each file
             and only raise errors if we try to use methods of modules that failed to import"""
             def __getattr__(self, attr):
                 raise ImportError(hint)
+
         return FailedImport()
 
 
@@ -56,7 +70,7 @@ def _get_single_index(vals: dict, i: int, j: int, k: int) -> dict:
     return new
 
 
-def loop_compute(eqn, args_dict: dict, dims: tuple):
+def _loop_compute(eqn, args_dict: dict, dims: tuple):
     # NOTE: This method requires all data arrays within the args dictionary to have the exact same shape
     computed = np.empty(dims)
     for i in range(dims[0]):

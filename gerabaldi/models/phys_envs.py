@@ -1,3 +1,6 @@
+# Copyright (c) 2023 Ian Hill
+# SPDX-License-Identifier: Apache-2.0
+
 """Classes for defining physical noise sources and measurement capabilities in a test environment."""
 
 from math import floor, log10
@@ -8,7 +11,7 @@ from pandas import Series
 
 from gerabaldi.models.devices import DeviceMdl
 from gerabaldi.models.reports import TestSimReport
-from gerabaldi.models.randomvars import Deterministic, RandomVar
+from gerabaldi.models.random_vars import Deterministic, RandomVar
 from gerabaldi.exceptions import InvalidTypeError, UserConfigError
 from gerabaldi.helpers import _on_demand_import
 
@@ -28,11 +31,6 @@ class MeasInstrument:
     ----------
     name : str, optional
         The name of the measurement instrument, usually the param it measures (default is 'generic')
-
-    Methods
-    -------
-    measure(true_vals)
-        Takes in exact parameter values and simulates the process of measuring them, returning the 'measured' values.
     """
 
     def __init__(self, name: str = 'generic', precision: int = None, error: RandomVar = None,
@@ -56,7 +54,7 @@ class MeasInstrument:
 
     def measure(self, true_vals: Series | int | float | np.ndarray):
         """
-        Returns a simulated measured value of a 'true' parameter value.
+        Takes in exact parameter values and simulates the process of measuring them, returning the 'measured' values.
 
         Parameters
         ----------
@@ -101,6 +99,19 @@ class EnvVrtnMdl:
     """
     Specifies the full stochastic model used for generating variations in environmental conditions. This model is quite
     similar to the LatentVar class, with a few key differences related to batches vs. lots and unspecified base vals.
+
+    Attributes
+    ----------
+    name: str
+        A useful name for the variable
+    dev_vrtn_mdl: RandomVar
+        The statistical distribution defining how the condition value varies between individual devices on a chip
+    chp_vrtn_mdl: RandomVar
+        The statistical distribution defining how the condition value varies between different chips within the test
+    batch_vrtn_mdl: RandomVar
+        The statistical distribution defining how the condition value varies for all chips under test in a batch
+    vrtn_type: str
+        How the distributions at different stochastic layers are combined to produce a final value, sum or product
     """
     # Don't let users add new attributes to the class, helps protect from typos causing bugs
     __slots__ = ['name', 'vrtn_type', '_unitary', '_op',
@@ -112,8 +123,22 @@ class EnvVrtnMdl:
     dev_vrtn_mdl: RandomVar
 
     def __init__(self, dev_vrtn_mdl: RandomVar = None, chp_vrtn_mdl: RandomVar = None, batch_vrtn_mdl: RandomVar = None,
-                 vrtn_type: str = 'offset', mdl_name: str = None):
-        self.name = mdl_name
+                 vrtn_type: str = 'offset', name: str = None):
+        """
+        Parameters
+        ----------
+        dev_vrtn_mdl: RandomVar, optional
+            The distribution defining how the condition value varies between devices on a chip
+        chp_vrtn_mdl: RandomVar, optional
+            The distribution defining how the condition value varies across different chips
+        batch_vrtn_mdl: RandomVar, optional
+            The distribution defining how the condition value varies across production lots
+        name: str, optional
+            Name for the variable, used when transpiling the variable for use in CBI frameworks
+        vrtn_type: str, optional
+            The operation used to add the effects of the chip and lot variations, offset or scaling (default 'scaling')
+        """
+        self.name = name
         # Set this first to avoid a circular dependency problem between vrtn_type and <layer>_vrtn_mdl assignment logic
         self._unitary = 0
         # Note that there are no lot variations here as the test environment is completely ignorant of what lot a device
@@ -145,7 +170,7 @@ class EnvVrtnMdl:
                     self.chp_vrtn_mdl = None # noqa: PyTypeChecker
                 if not self._dev_vrtns:
                     self.dev_vrtn_mdl = None # noqa: PyTypeChecker
-        # If changing a variation model we need to update it's user-defined status flag and set to a unitary if removed
+        # If changing a distribution we need to update its 'is defined' flag and set to generate the unitary if removed
         elif name == 'batch_vrtn_mdl':
             self._batch_vrtns = False if value is None else True
             if not self._batch_vrtns:
@@ -161,15 +186,64 @@ class EnvVrtnMdl:
         super(EnvVrtnMdl, self).__setattr__(name, value)
 
     def gen_batch_vrtn(self, base_val: int | float) -> np.ndarray:
+        """
+        Generate a stochastic variation value for the environmental condition at the batch stochastic layer
+
+        Parameters
+        ----------
+        base_val: numpy.ndarray or int or float
+            The target value for the environmental condition that the variation will be applied to
+
+        Returns
+        -------
+        numpy.ndarray
+            A 3-dimensional (1, 1, 1) array with the varied value for the condition, indexing style is lot->chp->dev
+        """
         return self._op(base_val, self.batch_vrtn_mdl.sample())
 
-    def gen_chp_vrtns(self, base_val: int | float | np.ndarray, num_chps: int = 1, num_lots: int = 1) -> np.ndarray:
+    def gen_chp_vrtns(self, base_vals: int | float | np.ndarray, num_chps: int = 1, num_lots: int = 1) -> np.ndarray:
+        """
+        Generate variational samples of the environmental condition at the between chips stochastic layer. Note that
+        this method should be called AFTER any batch-level variations have been generated and applied, thus
+        base_vals should already be a stochastic set of values at this point.
+
+        Parameters
+        ----------
+        base_vals: numpy.ndarray or int or float
+            The values for the environmental condition that the variations will be applied to
+        num_chps: int, optional
+            Quantity of devices/instances influenced by the condition on each chip (default 1)
+        num_lots: int, optional
+            Quantity of production lots of chips in the test batch (default 1)
+
+        Returns
+        -------
+        numpy.ndarray
+            A 3-dimensional array with the varied values for the condition, indexing style is lot->chp->dev
+        """
         # First create an array of the correct size filled with the base value
-        vals = np.full((num_lots, num_chps), base_val)
+        vals = np.full((num_lots, num_chps), base_vals)
         # Now include the effect of chip-to-chip variations
         return self._op(vals, self.chp_vrtn_mdl.sample(num_chps * num_lots).reshape((num_lots, num_chps)))
 
     def gen_dev_vrtns(self, base_vals: int | float | np.ndarray, num_devs: int = 1) -> np.ndarray:
+        """
+        Generate variational samples of the environmental condition at the between device stochastic layer. Note that
+        this method should be called AFTER any batch and chip-level variations have been generated and applied, thus
+        base_vals should already be a stochastic set of values at this point.
+
+        Parameters
+        ----------
+        base_vals: numpy.ndarray or int or float
+            The values for the environmental condition that the variations will be applied to
+        num_devs: int, optional
+            Quantity of devices/instances influenced by the condition on each chip (default 1)
+
+        Returns
+        -------
+        numpy.ndarray
+            A 3-dimensional array with the varied values for the condition, indexing style is lot->chp->dev
+        """
         # Format the base value into a 2D numpy array if not already in that form to represent 1 chip and 1 batch
         if type(base_vals) != np.ndarray:
             base_vals = np.array([[base_vals]])
@@ -177,7 +251,27 @@ class EnvVrtnMdl:
         return self._op(np.expand_dims(base_vals, axis=-1), self.dev_vrtn_mdl.sample(num_devs * base_vals.size).
                         reshape((base_vals.shape[0], base_vals.shape[1], num_devs)))
 
-    def gen_env_vrtns(self, base_val: int | float, num_devs: int = 1, num_chps: int = 1, num_lots: int = 1) -> np.ndarray:
+    def gen_env_vrtns(self, base_val: int | float,
+                      num_devs: int = 1, num_chps: int = 1, num_lots: int = 1) -> np.ndarray:
+        """
+        Generate stochastic samples of the environmental condition for some number of samples, devices, and lots
+
+        Parameters
+        ----------
+        base_val: int or float
+            The target value for the environmental condition that the variations will be applied to
+        num_devs: int, optional
+            Quantity of devices/instances influenced by the condition on each chip (default 1)
+        num_chps: int, optional
+            Quantity of chips with latent variable devices/instances on them (default 1)
+        num_lots: int, optional
+            Quantity of production lots of chips (default 1)
+
+        Returns
+        -------
+        numpy.ndarray
+            A 3-dimensional array with the varied values for the condition, indexing style is lot->chp->dev
+        """
         return self.gen_dev_vrtns(self.gen_chp_vrtns(self.gen_batch_vrtn(base_val), num_chps, num_lots), num_devs)
 
 
@@ -193,15 +287,6 @@ class PhysTestEnv:
         Stochastic distributions representing the variability for the environmental parameter in the attribute name
     <prm_name>_instm : MeasInstrument
         Measurement devices/instruments that will be used to measure the named parameter in the attribute name
-
-    Methods
-    -------
-    meas_instm(prm)
-        Retrieves the measurement instrument for a requested parameter
-    vrtn_mdl(prm)
-        Retrieves the variation/variability model for a requested parameter
-    gen_env_cond_vals(base_vals)
-        Varies a set of parameter values based on the variation models for those parameters
     """
 
     def __init__(self, env_vrtns: dict | list = None, meas_instms: dict | list = None, env_name: str = 'unspecified'):
@@ -270,7 +355,33 @@ class PhysTestEnv:
         return getattr(self, prm + '_var', EnvVrtnMdl())
 
     def gen_env_cond_vals(self, base_vals: dict, prms: list | dict, test_info: TestSimReport = None,
-                          dev_mdl: DeviceMdl = None, target: str = 'stress', num_chps: int = 1, num_lots: int = 1):
+                          dev_mdl: DeviceMdl = None, target: str = 'stress',
+                          num_chps: int = 1, num_lots: int = 1) -> dict:
+        """
+        Generate/sample stochastic values for environmental conditions/parameters
+
+        Parameters
+        ----------
+        base_vals: dict
+            Mapping of environmental conditions/parameters to their target base values before stochastic influences
+        prms: list or dict
+            The list of parameters to generate values for, if a dict values are the number of samples to generate
+        test_info: TestSimReport, optional
+            Report that can be used to determine the number of samples for each param and number of chips and lots
+        dev_mdl: DeviceMdl, optional
+            The full device model, used to determine which conditions are required to be generated to save work
+        target: str, optional
+            Either 'stress' or 'measure', used to determine which conditions are required to be generated to save work
+        num_chps: int, optional
+            How many chips per lot to generate sampled values for, only needed if test_info not provided
+        num_lots: int, optional
+            How many lots to generate sampled values for, only needed if test_info not provided
+
+        Returns
+        -------
+        dict of numpy.ndarray
+            A dictionary of 3D generated value arrays for each condition/parameter, indexing style lot->chp->dev
+        """
         # First generate the chip variations for all conditions, as these are shared across parameters whereas device
         # specific conditions are unique and environmental conditions are oblivious to what lot a chip is from
         num_chps = test_info.num_chps if test_info else num_chps
@@ -311,5 +422,4 @@ class PhysTestEnv:
                 sensor_vals = self.vrtn_mdl(cond).gen_chp_vrtns(batch[cond], dev_counts[prm])
                 # We treat each sensor as a separate chip with only 1 device for measurement each
                 cond_vals[prm] = {cond: self.vrtn_mdl(cond).gen_dev_vrtns(sensor_vals, 1)}
-
         return cond_vals

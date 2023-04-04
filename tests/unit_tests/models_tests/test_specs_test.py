@@ -56,7 +56,7 @@ def test_test_spec():
 
     # Now add non-default values
     meas2 = MeasSpec({'delay': 15, 'current': 2}, {'temp': 100}, 'GenericMeas2')
-    test = TestSpec([meas, stress, meas], 2, 3, 'This test has non-default arguments', 'Good Fun')
+    test = TestSpec([meas, stress, meas], 2, 3, 'Good Fun', 'This test has non-default arguments')
     test.append_steps(meas2)
     assert (test.num_chps, test.num_lots) == (2, 3)
     assert test.description == 'This test has non-default arguments'

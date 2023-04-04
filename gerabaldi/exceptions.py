@@ -1,6 +1,7 @@
-"""
-Custom exceptions and error handling for Gerabaldi.
-"""
+# Copyright (c) 2023 Ian Hill
+# SPDX-License-Identifier: Apache-2.0
+
+"""Custom exceptions and error handling types for Gerabaldi"""
 
 __all__ = ['MissingParamError', 'NotYetSupportedError', 'UserConfigError', 'InvalidTypeError',
            'ParamOverwriteWarning', 'IdealWarning', 'ArgOverwriteWarning']

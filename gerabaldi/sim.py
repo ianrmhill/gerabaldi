@@ -1,10 +1,11 @@
-"""
-Gerabaldi top-level simulation flow functions
-"""
+# Copyright (c) 2023 Ian Hill
+# SPDX-License-Identifier: Apache-2.0
+
+"""Gerabaldi top-level simulation execution functions"""
 
 import pandas as pd
-import numpy as np
 from datetime import timedelta
+from copy import deepcopy
 
 from gerabaldi.models import *
 from gerabaldi.exceptions import MissingParamError, UserConfigError
@@ -15,22 +16,30 @@ SECONDS_PER_HOUR = 3600
 
 
 def gen_init_state(dev_mdl: DeviceMdl, dev_counts: dict = None, num_chps: int = 1, num_lots: int = 1,
-                   quantity_info: TestSimReport = None, elapsed_time: timedelta | int | float = timedelta()) -> TestSimState:
+                   quantity_info: TestSimReport = None,
+                   elapsed_time: timedelta | int | float = timedelta()) -> TestSimState:
     """
-    This function prepares a test state object for a specified set of test circuits and their states for use in a
-    reliability test.
+    Prepare a test state object for a specified device model prior to execution/simulation of a wear-out test
 
     Parameters
     ----------
-    dev_mdl
-    dev_counts: A dict of with keys of the different parameters to measure and the quantity of samples for each
-    num_chps: The number of chips per lot to simulate
-    num_lots: The number of lots of devices to simulate
-    elapsed_time: Initial state should be at time 0, override exists to allow for manual setup of intermediate state
+    dev_mdl: DeviceMdl
+        The physical model of a device with measurable parameters that requires a state to be generated for
+    dev_counts: dict of int, optional
+        Mapping from names of different parameters to measure to the quantity of samples for each
+    num_chps: int, optional
+        The number of chips per lot to generate state for
+    num_lots: int, optional
+        The number of production lots to generate state for
+    quantity_info: TestSimReport, optional
+        Simulation report that can be used to automatically determine the number of devices, chips, and lots involved
+    elapsed_time: timedelta or int or float, optional
+        Initial state should be at time 0, override exists to allow for manual setup of intermediate state
 
     Returns
     -------
-    init_state
+    TestSimState
+        The constructed initial state for the test containing initial parameter and sampled latent variable values
     """
     # First determine the source that will determine how many instances/devices for each parameter to initialize
     if quantity_info and not dev_counts:
@@ -67,10 +76,11 @@ def _sim_stress_step(step: StrsSpec, sim_state: TestSimState, dev_mdl: DeviceMdl
 
     for prm in deg_prm_list:
         # 2. Calculate the equivalent stress times that would have been needed under the generated stress conditions to
-        # obtain the prior degradation values. First we calculate the equivalent time to reach the current value of degradation
+        # obtain the prior degradation values. First we calculate the equivalent time to reach the current degradation
         equiv_times = dev_mdl.prm_mdl(prm).calc_equiv_strs_times(
             (report.num_lots, report.num_chps, report.dev_counts[prm]),
-            sim_state.curr_deg_mech_vals[prm], strs_conds[prm], sim_state.init_deg_mech_vals[prm], sim_state.latent_var_vals[prm])
+            sim_state.curr_deg_mech_vals[prm], strs_conds[prm],
+            sim_state.init_deg_mech_vals[prm], sim_state.latent_var_vals[prm])
         # Now add on the time for the current stress phase
         for mech in equiv_times:
             equiv_times[mech] += step.duration.total_seconds() / SECONDS_PER_HOUR
@@ -78,7 +88,8 @@ def _sim_stress_step(step: StrsSpec, sim_state: TestSimState, dev_mdl: DeviceMdl
         # 3. Simulate the degradation for each device after adding the equivalent prior stress time
         sim_state.curr_prm_vals[prm], sim_state.curr_deg_mech_vals[prm] = dev_mdl.prm_mdl(prm).calc_deg_vals(
             (report.num_lots, report.num_chps, report.dev_counts[prm]),
-            equiv_times, strs_conds[prm], sim_state.init_prm_vals[prm], sim_state.latent_var_vals[prm], sim_state.curr_deg_mech_vals[prm]
+            equiv_times, strs_conds[prm], sim_state.init_prm_vals[prm],
+            sim_state.latent_var_vals[prm], sim_state.curr_deg_mech_vals[prm]
         )
 
     # Update the elapsed real-world test time
@@ -136,16 +147,21 @@ def _sim_meas_step(step: MeasSpec, sim_state: TestSimState, dev_mdl: DeviceMdl,
     report.add_measurements(meas_results)
 
 
-def simulate(test_def: TestSpec, dev_mdl: DeviceMdl, test_env: PhysTestEnv, init_state: TestSimState = None):
+def simulate(test_def: TestSpec, dev_mdl: DeviceMdl, test_env: PhysTestEnv,
+             init_state: TestSimState = None) -> TestSimReport:
     """
     Simulate a given wear-out test using a given underlying model
 
     Parameters
     ----------
-    test_def : A complete test description that the defines the stress conditions, durations, and data to collect
-    dev_mdl : The underlying exact degradation model(s) to use to generate simulated test results
-    test_env : Definition of the test environment that determines how imprecision is injected into the test results
-    init_state: The starting values for the different device parameters that will degrade as the test proceeds
+    test_def:
+        A complete test description that the defines the stress conditions, durations, and data to collect
+    dev_mdl:
+        The underlying exact degradation model(s) to use to generate simulated test results
+    test_env:
+        Definition of the test environment that determines how imprecision is injected into the test results
+    init_state: TestSimState, optional
+        Starting values for device model parameters, optional as normally this will be generated automatically
 
     Returns
     -------
@@ -158,12 +174,10 @@ def simulate(test_def: TestSpec, dev_mdl: DeviceMdl, test_env: PhysTestEnv, init
     if not init_state:
         sim_state = gen_init_state(dev_mdl, quantity_info=test_report)
     else:
-        # TODO: Ensure simulate doesn't modify the arguments (likely only init_state at risk of modification)
-        #       this may be best achieved by giving TestSimState a copy method
-        sim_state = init_state
+        sim_state = deepcopy(init_state)
 
     # We now execute the test step by step, sequentially performing measurements and stress intervals in order
-    # Note that sim_state and test_report are mutated as the test progresses, the other arguments are left untouched
+    # Note that sim_state and test_report are mutated as the test progresses, the other data structures are untouched
     for step in test_def:
         # Check whether the next step is a measurement or period of stress
         if type(step) is StrsSpec:

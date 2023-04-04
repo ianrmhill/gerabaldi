@@ -1,23 +1,19 @@
-"""
-Custom complex data types/classes used in the Gerabaldi package.
+# Copyright (c) 2023 Ian Hill
+# SPDX-License-Identifier: Apache-2.0
 
-Description
------------
-This module defines the complex data types/classes specific to the gerabaldi package.
+"""Custom complex data types/classes used in the Gerabaldi package."""
 
-"""
-
-from . import testspecs, devices, physenvs, randomvars, reports, states
-from .testspecs import *
+from . import test_specs, devices, phys_envs, random_vars, reports, states
+from .test_specs import *
 from .devices import *
-from .physenvs import *
-from .randomvars import *
+from .phys_envs import *
+from .random_vars import *
 from .reports import *
 from .states import *
 
-__all__ = testspecs.__all__
+__all__ = test_specs.__all__
 __all__.extend(devices.__all__)
-__all__.extend(physenvs.__all__)
-__all__.extend(randomvars.__all__)
+__all__.extend(phys_envs.__all__)
+__all__.extend(random_vars.__all__)
 __all__.extend(reports.__all__)
 __all__.extend(states.__all__)

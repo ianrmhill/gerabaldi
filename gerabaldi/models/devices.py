@@ -1,16 +1,17 @@
-"""
-Classes for defining degradation models for tuning or use in simulating wear-out tests.
-"""
+# Copyright (c) 2023 Ian Hill
+# SPDX-License-Identifier: Apache-2.0
+
+"""Classes for defining degradation models for tuning or use in simulating wear-out tests"""
 
 import inspect
 import numpy as np
 from scipy.optimize import minimize_scalar
 from typing import Callable
 
-from gerabaldi.models.randomvars import RandomVar
+from gerabaldi.models.random_vars import RandomVar, Deterministic
 from gerabaldi.models.states import TestSimState
 from gerabaldi.exceptions import InvalidTypeError, UserConfigError
-from gerabaldi.helpers import _on_demand_import, loop_compute
+from gerabaldi.helpers import _on_demand_import, _loop_compute
 
 # Optional imports are loaded using a helper function that suppresses import errors until attempted use
 pymc = _on_demand_import('pymc')
@@ -25,9 +26,31 @@ __all__ = ['LatentVar', 'InitValMdl', 'CondShiftMdl', 'DegMechMdl', 'FailMechMdl
 
 class LatentVar:
     """
-    Class that defines the value and stochastic variation of a hidden/latent variable within a model equation.
+    Modelling framework for latent variables within wear-out models.
+
+    Representation of a probabilistic latent/hidden variable/parameter within Gerabaldi. Consists of a probability
+    distribution that defines the value of the latent variable along with optional chip and lot-level distributions that
+    are either multiplied or summed with the base device-level distribution to allow for sampling of values for the
+    variable. Can optionally override the probabilistic modelling by providing a deterministic value, resulting in a
+    more conventional style of simulation.
+
+    Attributes
+    ----------
+    name: str
+        A useful name for the variable
+    dev_vrtn_mdl: RandomVar
+        The statistical distribution defining the base value of the variable
+    chp_vrtn_mdl: RandomVar
+        The statistical distribution defining how the base value of the variable varies between different chips
+    lot_vrtn_mdl: RandomVar
+        The statistical distribution defining how the base value of the variable varies between production lots
+    vrtn_type: str
+        How the distributions at different stochastic layers are combined to produce a final value, sum or product
+    deter_val: float or int
+        Deterministic value override to obtain conventional simulation behaviour if no stochastic behaviour is desired
     """
-    __slots__ = ['name', 'vrtn_type', 'dev_vrtn_mdl', 'chp_vrtn_mdl', 'lot_vrtn_mdl', 'deter_val']
+    __slots__ = ['name', 'vrtn_type', 'deter_val', '_unitary', '_op',
+                 'dev_vrtn_mdl', '_dev_vrtns', 'chp_vrtn_mdl', '_chp_vrtns', 'lot_vrtn_mdl', '_lot_vrtns']
     name: str
     vrtn_type: str
     dev_vrtn_mdl: RandomVar
@@ -36,64 +59,127 @@ class LatentVar:
     deter_val: int | float
 
     def __init__(self, dev_vrtn_mdl: RandomVar = None, chp_vrtn_mdl: RandomVar = None, lot_vrtn_mdl: RandomVar = None,
-                 deter_val: float | int = None, var_name: str = None, vrtn_type: str = 'scaling'):
-        self.name = var_name
-        if vrtn_type not in ['scaling', 'offset']:
-            raise InvalidTypeError(f"Latent {self.name} variation type can only be one of 'scaling', 'offset'.")
-        self.vrtn_type = vrtn_type
-
-        # Each variation model is a callable stochastic value generator with some distribution
-        if not dev_vrtn_mdl and deter_val is None:
-            raise UserConfigError(f"Latent {self.name} definition must include either a device distribution or"
-                                  "deterministic value argument.")
+                 deter_val: float | int = None, name: str = None, vrtn_type: str = 'scaling'):
+        """
+        Parameters
+        ----------
+        dev_vrtn_mdl: RandomVar, optional
+            The distribution defining the base value of the variable
+        chp_vrtn_mdl: RandomVar, optional
+            The distribution defining how the variable value varies across different chips
+        lot_vrtn_mdl: RandomVar, optional
+            The distribution defining how the variable value varies across production lots
+        deter_val: float or int, optional
+            Deterministic base value for the variable
+        name: str, optional
+            Name for the variable, used when transpiling the variable for use in CBI frameworks
+        vrtn_type: str, optional
+            The operation used to add the effects of the chip and lot variations, offset or scaling (default 'scaling')
+        """
+        # Set unitary first to avoid circular dependency problem between vrtn_type and <layer>_vrtn_mdl setattr logic
+        self._unitary = 0
         self.dev_vrtn_mdl = dev_vrtn_mdl
         self.chp_vrtn_mdl = chp_vrtn_mdl
         self.lot_vrtn_mdl = lot_vrtn_mdl
         self.deter_val = deter_val
-
-    def rename(self, name):
+        # These must be set after so that the distributions can have their names and unitary values updated if needed
         self.name = name
-        # Give the distributions names if not manually specified
-        if self.dev_vrtn_mdl and not self.dev_vrtn_mdl.name:
-            # Set the distribution name to be the variable name + '_dev' suffix, unless the device variation model fully
-            # specifies the variable value, in which case don't add the suffix
-            if not self.chp_vrtn_mdl and not self.lot_vrtn_mdl and not self.deter_val:
-                self.dev_vrtn_mdl.name = self.name
-            else:
-                self.dev_vrtn_mdl.name = self.name + '_dev'
-        if self.chp_vrtn_mdl:
-            self.chp_vrtn_mdl.name = self.name + '_chp'
-        if self.lot_vrtn_mdl:
-            self.lot_vrtn_mdl.name = self.name + '_lot'
+        self.vrtn_type = vrtn_type
+        if not dev_vrtn_mdl and deter_val is None:
+            raise UserConfigError(f"Latent {self.name} definition must include either a device distribution or"
+                                  "deterministic value argument.")
+
+    def __setattr__(self, name, value):
+        if name == 'name':
+            # Need to also update the naming of the probabilistic distributions to have CBI export work correctly
+            if self._dev_vrtns and not self.dev_vrtn_mdl.name:
+                # Set the distribution name to be the variable name + '_dev' suffix, unless the device variation model
+                # fully specifies the variable value, in which case don't add the suffix
+                if not self._chp_vrtns and not self._lot_vrtns and not self._dev_vrtns:
+                    self.dev_vrtn_mdl.name = name
+                else:
+                    self.dev_vrtn_mdl.name = name + '_dev'
+            if self._chp_vrtns:
+                self.chp_vrtn_mdl.name = name + '_chp'
+            if self._chp_vrtns:
+                self.lot_vrtn_mdl.name = name + '_lot'
+        if name == 'vrtn_type':
+            # If changing the variation type we need to also update all the attributes that are used to compute values
+            if value not in ['scaling', 'offset']:
+                raise InvalidTypeError(f"Latent {self.name} variation type can only be one of 'scaling', 'offset'.")
+            # Only need to update all the attributes if the variation type is actually changing
+            if not hasattr(self, 'vrtn_type') or self.vrtn_type != value:
+                self._op = np.multiply if value == 'scaling' else np.add
+                self._unitary = 0 if value == 'offset' else 1
+                # Each variation model that is not user defined is reset to ensure the new unitary value is used
+                if not self._lot_vrtns:
+                    self.lot_vrtn_mdl = None # noqa: PyTypeChecker
+                if not self._chp_vrtns:
+                    self.chp_vrtn_mdl = None # noqa: PyTypeChecker
+                if not self._dev_vrtns:
+                    self.dev_vrtn_mdl = None # noqa: PyTypeChecker
+        # If changing a distribution we need to update its 'is defined' flag and set to generate the unitary if removed
+        if name == 'dev_vrtn_mdl':
+            self._dev_vrtns = False if value is None else True
+            if not self._dev_vrtns:
+                value = Deterministic(self._unitary)
+        if name == 'chp_vrtn_mdl':
+            self._chp_vrtns = False if value is None else True
+            if not self._chp_vrtns:
+                value = Deterministic(self._unitary)
+        if name == 'lot_vrtn_mdl':
+            self._lot_vrtns = False if value is None else True
+            if not self._lot_vrtns:
+                value = Deterministic(self._unitary)
+        super(LatentVar, self).__setattr__(name, value)
 
     def gen_latent_vals(self, num_devs: int = 1, num_chps: int = 1, num_lots: int = 1) -> np.ndarray:
-        """Generate stochastic variations for the specified number of individual samples, devices, and lots."""
-        op = np.multiply if self.vrtn_type == 'scaling' else np.add
+        """
+        Generate stochastic samples of the variable for the specified number of individual samples, devices, and lots.
 
-        # There are three definition cases:
-        # 1. Device distribution and no base value (intended probabilistic approach)
-        if self.deter_val is None:
-            # The device variations are held in a 3D array, allowing for easy indexing to the value for each sample
-            vals = self.dev_vrtn_mdl.sample(num_lots * num_chps * num_devs).reshape((num_lots, num_chps, num_devs))
+        Parameters
+        ----------
+        num_devs: int, optional
+            Quantity of devices/instances of this variable on each chip (default 1)
+        num_chps: int, optional
+            Quantity of chips with latent variable devices/instances on them (default 1)
+        num_lots: int, optional
+            Quantity of production lots of chips (default 1)
+
+        Returns
+        -------
+        numpy.ndarray
+            A 3-dimensional array with the sampled values for the variable, indexing style is lot->chp->dev
+        """
+
+        # If any/all of the distributions are not user-defined, the samples will all be unitary values (i.e. no-ops)
+        lot = self.lot_vrtn_mdl.sample(num_lots).reshape((num_lots, 1, 1))
+        chp = self.chp_vrtn_mdl.sample(num_lots * num_chps).reshape((num_lots, num_chps, 1))
+        dev = self.dev_vrtn_mdl.sample(num_lots * num_chps * num_devs).reshape((num_lots, num_chps, num_devs))
+
+        # Only include base deterministic value if defined
+        if self.deter_val is not None:
+            vals = self._op(np.full((num_lots, num_chps, num_devs), self.deter_val), dev)
         else:
-            # 2. deterministic base value provided, no device distribution (when following 'if' evaluates to False)
-            vals = np.full((num_lots, num_chps, num_devs), self.deter_val)
-            if self.dev_vrtn_mdl:
-                # 3. deterministic base value provided and device distribution
-                vals = op(vals, self.dev_vrtn_mdl.
-                           sample(num_lots * num_chps * num_devs).reshape((num_lots, num_chps, num_devs)))
-
-        # Now include the influence of the chip and lot level distributions if specified
-        if self.chp_vrtn_mdl:
-            # The generated arrays have to be carefully shaped for the numpy array operators to broadcast them correctly
-            vals = op(vals, self.chp_vrtn_mdl.sample(num_lots * num_chps).reshape((num_lots, num_chps, 1)))
-        if self.lot_vrtn_mdl:
-            vals = op(vals, self.lot_vrtn_mdl.sample(num_lots).reshape((num_lots, 1, 1)))
-        return vals
+            vals = dev
+        return self._op(self._op(vals, chp), lot)
 
     def cbi_export(self, target_framework: str = 'pymc'):
+        """
+        Transpile the latent variable model to the equivalent definition within a Python CBI framework
+
+        Parameters
+        ----------
+        target_framework: str, optional
+            The name of the CBI framework to transpile the model to (default 'pymc')
+
+        Returns
+        -------
+        various
+            The transpiled version of the variable for the requested CBI framework
+        """
         # A probabilistic distribution must be defined for the device variation model. If not, raise an error
-        if self.dev_vrtn_mdl:
+        if self._dev_vrtns:
             if target_framework == 'pymc':
                 op = np.multiply if self.vrtn_type == 'scaling' else np.add
             elif target_framework == 'pyro':
@@ -110,7 +196,7 @@ class LatentVar:
                 self.dev_vrtn_mdl.set_centre(self.deter_val, op)
 
             # Normal probabilistic model export, only incorporate the stochastic layers if used
-            if self.chp_vrtn_mdl and self.lot_vrtn_mdl:
+            if self._chp_vrtns and self._lot_vrtns:
                 dev = self.dev_vrtn_mdl.get_cbi_form(target_framework=target_framework)
                 chp = self.chp_vrtn_mdl.get_cbi_form(target_framework=target_framework)
                 lot = self.lot_vrtn_mdl.get_cbi_form(target_framework=target_framework)
@@ -118,14 +204,14 @@ class LatentVar:
                     cbi_dist = pymc.Deterministic(self.name, op(op(dev, chp), lot))
                 else:
                     cbi_dist = op(op(dev, chp), lot)
-            elif self.chp_vrtn_mdl and not self.lot_vrtn_mdl:
+            elif self._chp_vrtns and not self._lot_vrtns:
                 dev = self.dev_vrtn_mdl.get_cbi_form(target_framework=target_framework)
                 chp = self.chp_vrtn_mdl.get_cbi_form(target_framework=target_framework)
                 if target_framework == 'pymc':
                     cbi_dist = pymc.Deterministic(self.name, op(dev, chp))
                 else:
                     cbi_dist = op(dev, chp)
-            elif not self.chp_vrtn_mdl and self.lot_vrtn_mdl:
+            elif not self._chp_vrtns and self._lot_vrtns:
                 dev = self.dev_vrtn_mdl.get_cbi_form(target_framework=target_framework)
                 lot = self.lot_vrtn_mdl.get_cbi_form(target_framework=target_framework)
                 if target_framework == 'pymc':
@@ -134,7 +220,7 @@ class LatentVar:
                     cbi_dist = op(dev, lot)
             else:
                 cbi_dist = self.dev_vrtn_mdl.get_cbi_form(target_framework=target_framework)
-            # Return the dev_vrtn_mdl centre value to previous if it was changed to avoid any side effects
+            # Return the dev_vrtn_mdl centre value to previous if it was changed to avoid any method side effects
             if old_centre:
                 self.dev_vrtn_mdl.set_centre(old_centre)
             return cbi_dist
@@ -143,7 +229,11 @@ class LatentVar:
 
 
 class LatentMdl:
-    """Base class for modelling physical phenomenon with hidden/uncertain underlying parameters."""
+    """
+    Base class for modelling physical phenomenon with hidden/uncertain underlying parameters.
+
+    This class should not be instantiated directly, use an inheriting class.
+    """
     def __init__(self, mdl_eqn: Callable = None, mdl_name: str = None, **latent_vars: LatentVar):
         self.name = mdl_name
         # Add default to ensure the object attribute can always be called
@@ -157,22 +247,66 @@ class LatentMdl:
         for var in latent_vars:
             # If no name was specified for the latent variable, nice to set it to the same name as used in the model
             if not latent_vars[var].name:
-                latent_vars[var].rename(var)
+                latent_vars[var].name = var
             # Indicate the latent variable attributes as private since they're supposed to be uncertain
             setattr(self, f"_latent_{var}", latent_vars[var])
             self.latent_vars.append(var)
 
-    def latent_var(self, var):
+    def latent_var(self, var: str):
+        """
+        Get a latent variable within the model by name
+
+        Parameters
+        ----------
+        var: str
+            The name of the variable to retrieve the LatentVar object for
+
+        Returns
+        -------
+        LatentVar
+            The Gerabaldi representation of the requested latent variable
+        """
         return getattr(self, f"_latent_{var}")
 
     def gen_latent_vals(self, num_devs: int = 1, num_chps: int = 1, num_lots: int = 1) -> dict:
-        """Generate 'true'/underlying values for all the model's latent variables for each sample, device, and lot."""
+        """
+        Generate 'true'/underlying sampled values for all the model's latent variables for each device, chip, and lot
+
+        Parameters
+        ----------
+        num_devs: int, optional
+            Quantity of devices per chip to generate samples for (default 1)
+        num_chps: int, optional
+            Quantity of chips per lot to generate samples for (default 1)
+        num_lots: int, optional
+            Quantity of production lots to generate samples for (default 1)
+
+        Returns
+        -------
+        dict of numpy.ndarray
+            Mapping from latent variable name to the 3D array of sampled values, indexing style lot->chp->dev
+        """
         vals = {}
         for var in self.latent_vars:
             vals[var] = self.latent_var(var).gen_latent_vals(num_devs, num_chps, num_lots)
         return vals
 
     def export_to_cbi(self, target_framework: str = 'pymc', observed: dict = None):
+        """
+        Transpile the latent model for a target CBI framework. Method not yet stable, likely to change.
+
+        Parameters
+        ----------
+        target_framework: str, optional
+            The target CBI framework (default 'pymc')
+        observed: dict, optional
+            Mapping from stress conditions to measured/observed values, used for inference
+
+        Returns
+        -------
+        various
+            The transpiled equivalent latent model for the target CBI framework
+        """
         # First create latent variables for the hidden model parameters
         vals = {}
         for var in self.latent_vars:
@@ -194,7 +328,11 @@ class LatentMdl:
 
 
 class MechMdl(LatentMdl):
-    """Class for modelling the effect of a wear-out reliability mechanism on some physical parameter."""
+    """
+    Class for modelling the effect of a wear-out reliability mechanism on some physical parameter.
+
+    This class should not be instantiated directly, use an inheriting class.
+    """
     def __init__(self, mech_eqn: Callable = None, mdl_name: str = None, unitary_val: int = 0, **latent_vars):
         if not mech_eqn:
             # Default is a non-degrading model, parameter stays the same (i.e. 'fresh') regardless of stress and time
@@ -231,7 +369,7 @@ class MechMdl(LatentMdl):
         try:
             deg_vals = self.compute(**arg_vals)
         except ValueError:
-            deg_vals = loop_compute(self.compute, arg_vals, dims)
+            deg_vals = _loop_compute(self.compute, arg_vals, dims)
 
         # Overwrite the calculated degradation for the samples that we knew wouldn't degrade to the previous values
         # Note that we do a little extra work here as deg_vals is still computed for the non-degrading samples, but this
@@ -259,6 +397,7 @@ class DegMechMdl(MechMdl):
         """
         # Computes the absolute difference between the target value and the calculated value using a given time
         def residue(time, curr_deg_val, conds, ltnts):
+            #return abs(curr_deg_val - self.calc_deg_vals(time, conds, ltnts))
             return abs(curr_deg_val - self.calc_deg_vals_lite(time, conds, ltnts))
 
         # Minimize the difference between the output and the target/observed value using scipy optimizer
@@ -320,7 +459,7 @@ class CondShiftMdl(LatentMdl):
         try:
             return self.compute(**arg_vals)
         except ValueError:
-            return loop_compute(self.compute, arg_vals, dims)
+            return _loop_compute(self.compute, arg_vals, dims)
 
 
 class InitValMdl(LatentMdl):
@@ -484,7 +623,7 @@ class DegPrmMdl(LatentMdl):
                          'strs_conds': strs_conds, 'latents': latents[mech], 'dims': strs_dims}
             # Currently we always loop compute because the numerical method used to calculate equivalent stress time
             # from the SciPy library is not array computable
-            equiv_times[mech] = loop_compute(self.mech_mdl(mech).calc_equiv_strs_time, args_dict, strs_dims)
+            equiv_times[mech] = _loop_compute(self.mech_mdl(mech).calc_equiv_strs_time, args_dict, strs_dims)
         return equiv_times
 
     def calc_deg_vals(self, strs_dims: tuple, times: dict, strs_conds: dict,
@@ -530,7 +669,7 @@ class DegPrmMdl(LatentMdl):
         try:
             prm_vals = self.compute(**arg_vals)
         except ValueError:
-            prm_vals = loop_compute(self.compute, arg_vals, strs_dims)
+            prm_vals = _loop_compute(self.compute, arg_vals, strs_dims)
         return prm_vals, mech_vals
 
     def calc_cond_shifted_vals(self, meas_dims: tuple, conds: dict, deg_vals: np.ndarray, latents: dict) -> np.ndarray:
@@ -577,7 +716,7 @@ class DegPrmMdl(LatentMdl):
         try:
             return self.compute(**arg_vals)
         except ValueError:
-            return loop_compute(self.compute, arg_vals, meas_dims)
+            return _loop_compute(self.compute, arg_vals, meas_dims)
 
     def get_dependencies(self, conditions, target):
         # Typically no environmental conditions will be used in the parameter compute function, but check just in case
@@ -594,8 +733,22 @@ class DegPrmMdl(LatentMdl):
 
 class CircPrmMdl(LatentMdl):
     """
-    Class for expressing higher-level parameters that are affected by degraded parameters. Stateless other than
-    sampled values for latent variables.
+    Class for expressing higher-level parameters that are affected by degraded parameters
+
+    This model contains a computable equation that is a function of degraded device parameters, stress conditions, and
+    latent variables. The equation can more generally be any callable Python function, so long as it returns a single
+    value for the parameter as the output.
+
+    Attributes
+    ----------
+    name: str
+        The model name
+    compute: Callable
+        A callable Python function that computes the parameter output value as a function of required inputs
+    compute_args: list
+        A listing of the model's compute equation function signature for easy identification of required model inputs
+    latent_vars: list
+        A listing of the latent variables that the model's compute equation takes as inputs
     """
     def calc_circ_vals(self, num_samples, strs_conds, degraded_prm_vals, latents) -> np.ndarray:
         arg_vals = {}
@@ -612,10 +765,37 @@ class CircPrmMdl(LatentMdl):
         return circ_vals
 
     def get_required_prms(self, mdl_prm_list):
+        """
+        Given a list of all available device parameters, get the subset required to compute this model's output value
+
+        Parameters
+        ----------
+        mdl_prm_list: list
+            The list of device parameters to filter/reduce to only those required by this model
+
+        Returns
+        -------
+        list
+            The subset of device parameters that are named in the model's compute equation signature
+        """
         # Determine which of the list of parameters are used to compute the value of this circuit parameter
         return [prm for prm in mdl_prm_list if prm in self.compute_args]
 
-    def get_dependencies(self, conditions, target):
+    def get_dependencies(self, conditions, target: str = None): # noqa: UnusedParameter
+        """
+        Given a list of all stress conditions, get the subset that influence this model's output value
+
+        Parameters
+        ----------
+        conditions: list
+            The list of all available stress conditions to filter/reduce to only those required by this model
+        target: str, unused
+            Argument used to provide method signature compatibility with the DegPrmMdl implementation
+
+        Returns
+        -------
+
+        """
         # Note that 'target' is an unused argument here, but needs to be kept to match the signature of get_dependencies
         # for the DegPrmMdl class
         return [arg for arg in self.compute_args if arg in conditions]
