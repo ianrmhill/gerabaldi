@@ -1,10 +1,11 @@
-"""
-Unit tests for the helper functions within Gerabaldi.
-"""
+# Copyright (c) 2023 Ian Hill
+# SPDX-License-Identifier: Apache-2.0
+
+"""Unit tests for the helper functions within Gerabaldi"""
 
 import numpy as np
 
-from gerabaldi.helpers import _loop_compute
+from gerabaldi.helpers import _loop_compute # noqa: AccessProtectedMember
 
 
 def test_loop_compute():

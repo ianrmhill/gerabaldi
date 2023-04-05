@@ -1,11 +1,13 @@
-"""Test set ensuring correct functionality of the classes used to model physical degradation processes."""
+# Copyright (c) 2023 Ian Hill
+# SPDX-License-Identifier: Apache-2.0
 
-import pytest
+"""Test set ensuring correct functionality of the classes used to model physical degradation processes"""
+
+import pytest # noqa: PackageNotInRequirements
 import numpy as np
-from pyrsistent import pmap
 
 from gerabaldi.models.devices import *
-from gerabaldi.models.devices import LatentMdl
+from gerabaldi.models.devices import LatentMdl # noqa: ImportedFunctionNotInAll
 from gerabaldi.models.random_vars import Deterministic
 from gerabaldi.exceptions import UserConfigError, InvalidTypeError
 
@@ -13,9 +15,9 @@ from gerabaldi.exceptions import UserConfigError, InvalidTypeError
 def test_latent_var(sequential_var):
     # First test error cases
     with pytest.raises(UserConfigError):
-        ltnt = LatentVar()
+        _ = LatentVar()
     with pytest.raises(InvalidTypeError):
-        ltnt = LatentVar(Deterministic(2), vrtn_type='invalid')
+        _ = LatentVar(Deterministic(2), vrtn_type='invalid')
 
     # Now test basic probabilistic definition behaviour
     ltnt = LatentVar(sequential_var(0.2, 0.2))
@@ -28,7 +30,8 @@ def test_latent_var(sequential_var):
 
     # Next test basic deterministic behaviour
     ltnt = LatentVar(deter_val=2)
-    assert (type(ltnt.dev_vrtn_mdl), type(ltnt.chp_vrtn_mdl), type(ltnt.lot_vrtn_mdl), ltnt.name, ltnt.deter_val, ltnt.vrtn_type) == \
+    assert (type(ltnt.dev_vrtn_mdl), type(ltnt.chp_vrtn_mdl), type(ltnt.lot_vrtn_mdl),
+            ltnt.name, ltnt.deter_val, ltnt.vrtn_type) == \
            (Deterministic, Deterministic, Deterministic, None, 2, 'scaling')
     assert ltnt.gen_latent_vals() == np.full((1, 1, 1), 2)
     ltnt = LatentVar(deter_val=0, chp_vrtn_mdl=sequential_var(1, 1), vrtn_type='offset')
@@ -38,10 +41,10 @@ def test_latent_var(sequential_var):
     ltnt = LatentVar(sequential_var(), sequential_var(), sequential_var(), 0.2, 'uno', 'offset')
     assert (ltnt.name, ltnt.vrtn_type) == ('uno', 'offset')
     assert np.allclose(ltnt.gen_latent_vals(2, 2, 2), np.array([[[0.2, 1.2], [3.2, 4.2]],
-                                                                    [[7.2, 8.2], [10.2, 11.2]]]))
+                                                                [[7.2, 8.2], [10.2, 11.2]]]))
     ltnt.vrtn_type = 'scaling'
     assert np.allclose(ltnt.gen_latent_vals(2, 2, 2), np.array([[[0.0, 0.0], [0.0, 0.0]],
-                                                                    [[1.6, 2.0], [3.6, 4.2]]]))
+                                                                [[1.6, 2.0], [3.6, 4.2]]]))
 
 
 def test_latent_mdl(sequential_var):
@@ -66,8 +69,8 @@ def test_init_val_mdl_basic(sequential_var):
 
     def weird_one(base, auto_fail): return np.where(auto_fail > 0, base, 0)
     mdl = InitValMdl(init_val_eqn=weird_one, mdl_name='Very Unusual',
-                       base=LatentVar(deter_val=0.6, chp_vrtn_mdl=sequential_var(0.1, 0.1), vrtn_type='offset'),
-                       auto_fail=LatentVar(deter_val=0, dev_vrtn_mdl=sequential_var(-2, 1), vrtn_type='offset'))
+                     base=LatentVar(deter_val=0.6, chp_vrtn_mdl=sequential_var(0.1, 0.1), vrtn_type='offset'),
+                     auto_fail=LatentVar(deter_val=0, dev_vrtn_mdl=sequential_var(-2, 1), vrtn_type='offset'))
     assert mdl.name == 'Very Unusual'
     assert np.allclose(mdl.gen_init_vals(2, 2, 2),
                        np.array([[[0, 0], [0, 0.8]], [[0.9, 0.9], [1, 1]]]))
@@ -84,8 +87,8 @@ def test_conditional_shift_model(sequential_var):
     def some_shifting(temp, vdd, a, b):
         return (a * temp) + (b * (-vdd))
     mdl = CondShiftMdl(some_shifting, 'TestShift',
-                         a=LatentVar(deter_val=0.1, dev_vrtn_mdl=sequential_var(1, 0.1)),
-                         b=LatentVar(deter_val=0.5, dev_vrtn_mdl=sequential_var(1, 0.1)))
+                       a=LatentVar(deter_val=0.1, dev_vrtn_mdl=sequential_var(1, 0.1)),
+                       b=LatentVar(deter_val=0.5, dev_vrtn_mdl=sequential_var(1, 0.1)))
     assert mdl.name == 'TestShift'
     latents = mdl.gen_latent_vals(3)
     assert np.allclose(latents['a'], [[[0.1, 0.11, 0.12]]])
@@ -128,31 +131,35 @@ def test_deg_prm_mdl(sequential_var):
     def degradation(time, temp, a, b): return (time**a) * (temp**b)
     def shift(temp, vdd, a, b): return a * (temp**b) * vdd
     mdl = DegPrmMdl(DegMechMdl(degradation, mdl_name='sample_mech',
-                                          a=LatentVar(deter_val=0.3, dev_vrtn_mdl=sequential_var(0, 0.1), vrtn_type='offset'),
-                                          b=LatentVar(deter_val=0.8, dev_vrtn_mdl=sequential_var(0, 0.1), vrtn_type='offset')),
-                             InitValMdl(init_val=LatentVar(deter_val=2, dev_vrtn_mdl=sequential_var(), vrtn_type='offset')),
-                             CondShiftMdl(shift,
-                                            a=LatentVar(deter_val=0.5, dev_vrtn_mdl=sequential_var(0, 0.1), vrtn_type='offset'),
-                                            b=LatentVar(deter_val=1.2, dev_vrtn_mdl=sequential_var(0, 0.1), vrtn_type='offset')))
+                               a=LatentVar(deter_val=0.3, dev_vrtn_mdl=sequential_var(0, 0.1), vrtn_type='offset'),
+                               b=LatentVar(deter_val=0.8, dev_vrtn_mdl=sequential_var(0, 0.1), vrtn_type='offset')),
+                    InitValMdl(init_val=LatentVar(deter_val=2, dev_vrtn_mdl=sequential_var(), vrtn_type='offset')),
+                    CondShiftMdl(shift,
+                                 a=LatentVar(deter_val=0.5, dev_vrtn_mdl=sequential_var(0, 0.1), vrtn_type='offset'),
+                                 b=LatentVar(deter_val=1.2, dev_vrtn_mdl=sequential_var(0, 0.1), vrtn_type='offset')))
     latents = mdl.gen_latent_vals(3)
     init_prm_vals = mdl.init_mdl.gen_init_vals(3)
     init_mech_vals = {'sample_mech': np.zeros((1, 1, 3))}
     conditions = {'temp': [[[25, 26, 30]]], 'vdd': [[[0.5, 0.55, 0.55]]]}
     prms, mechs = mdl.calc_deg_vals((1, 1, 3), {'sample_mech': 10}, conditions, init_prm_vals, latents, init_mech_vals)
     assert np.allclose(prms.round(4), [[[28.2031, 50.1494, 98.8683]]])
-    prms = mdl.calc_cond_shifted_vals((1, 1, 3), {'temp': 125, 'vdd': 0.6}, np.array([[[28.2031, 50.1494, 98.8683]]]), latents)
+    prms = mdl.calc_cond_shifted_vals((1, 1, 3), {'temp': 125, 'vdd': 0.6},
+                                      np.array([[[28.2031, 50.1494, 98.8683]]]), latents)
     assert np.allclose(prms.round(4), [[[126.6979, 241.7009, 461.0473]]])
 
     # Test that the individual vs. array computation is equivalent
     mdl.array_compute = False
     prms, mechs = mdl.calc_deg_vals((1, 1, 3), {'sample_mech': 10}, conditions, init_prm_vals, latents, init_mech_vals)
     assert np.allclose(prms.round(4), [[[28.2031, 50.1494, 98.8683]]])
-    prms = mdl.calc_cond_shifted_vals((1, 1, 3), {'temp': 125, 'vdd': 0.6}, np.array([[[28.2031, 50.1494, 98.8683]]]), latents)
+    prms = mdl.calc_cond_shifted_vals((1, 1, 3), {'temp': 125, 'vdd': 0.6},
+                                      np.array([[[28.2031, 50.1494, 98.8683]]]), latents)
     assert np.allclose(prms.round(4), [[[126.6979, 241.7009, 461.0473]]])
 
     # Test equivalent time calculation
-    equiv_times = mdl.calc_equiv_strs_times((1, 1, 3), {'sample_mech': [[[26.2031, 47.1494, 94.8683]]]}, conditions, init_mech_vals, latents)
+    equiv_times = mdl.calc_equiv_strs_times((1, 1, 3), {'sample_mech': [[[26.2031, 47.1494, 94.8683]]]},
+                                            conditions, init_mech_vals, latents)
     assert np.allclose(equiv_times['sample_mech'].round(4), [[[10, 10, 10]]])
     conditions = {'temp': 26, 'vdd': 0.55}
-    equiv_times = mdl.calc_equiv_strs_times((1, 1, 3), {'sample_mech': [[[26.2031, 47.1494, 94.8683]]]}, conditions, init_mech_vals, latents)
+    equiv_times = mdl.calc_equiv_strs_times((1, 1, 3), {'sample_mech': [[[26.2031, 47.1494, 94.8683]]]},
+                                            conditions, init_mech_vals, latents)
     assert np.allclose(equiv_times['sample_mech'].round(4), [[[9.007, 10, 13.3136]]])

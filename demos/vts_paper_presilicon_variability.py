@@ -1,12 +1,9 @@
 # Copyright (c) 2023 Ian Hill
 # SPDX-License-Identifier: Apache-2.0
 
-import click
-import time
+import time as t
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sb
 
 import os
 import sys
@@ -15,8 +12,13 @@ import sys
 # installing it as a package from pip (which is undesirable because you would have to rebuild the package every time
 # you changed part of the code).
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-import gerabaldi
-from gerabaldi.models import *
+import gerabaldi # noqa: ImportNotAtTopOfFile
+from gerabaldi.models import * # noqa: ImportNotAtTopOfFile
+from gerabaldi.helpers import _on_demand_import # noqa: ImportNotAtTopOfFile
+
+click = _on_demand_import('click')
+plt = _on_demand_import('matplotlib.pyplot', 'matplotlib')
+sb = _on_demand_import('seaborn')
 
 DATA_FILES = {'Current Process: Ramped Cycling': 'curr_ramp_report', 'Current Process: HTOL': 'curr_htol_report',
               'Current Process: LTOL': 'curr_ltol_report',
@@ -87,7 +89,7 @@ def simulate(save_files: dict = None):
         v_th = init + bti + hci + cond
         return v_th
 
-    def amp_gain_eqn(v_th, u_n, c_ox, w, l, v_e, vdd):
+    def amp_gain_eqn(v_th, u_n, c_ox, w, l, v_e, vdd): # noqa: AmbiguousVariableName
         v_gs_1 = 0.54 * vdd
         v_gs_2 = 0.69 * vdd
         i_d_1 = 0.5 * (u_n * c_ox * (w / l)) * ((v_gs_1 - v_th) ** 2)
@@ -129,22 +131,21 @@ def simulate(save_files: dict = None):
     ### 4. Simulate the tests                                            ###
     ########################################################################
     test_list = list(DATA_FILES.keys())
-    start_time = time.time()
-    test_results = {}
+    start_time = t.time()
     # First simulate the expected results for the current generation of products
-    test_results[test_list[1]] = gerabaldi.simulate(htol_test, dev_mdl, test_env)
-    test_results[test_list[2]] = gerabaldi.simulate(ltol_test, dev_mdl, test_env)
-    test_results[test_list[0]] = gerabaldi.simulate(ramp_failure_test, dev_mdl, test_env)
+    test_results = {test_list[1]: gerabaldi.simulate(htol_test, dev_mdl, test_env),
+                    test_list[2]: gerabaldi.simulate(ltol_test, dev_mdl, test_env),
+                    test_list[0]: gerabaldi.simulate(ramp_failure_test, dev_mdl, test_env)}
 
     # Now simulate for the upcoming process, need to adjust the initial value lot variability and 'alpha' in each model
-    dev_mdl.prm_mdl('v_th').init_mdl._latent_init_val.lot_vrtn_mdl = Normal(0, 0.0006)
-    dev_mdl.prm_mdl('v_th').mech_mdl('bti')._latent_alpha.chp_vrtn_mdl = Normal(1, 0.01)
-    dev_mdl.prm_mdl('v_th').mech_mdl('hci')._latent_alpha.chp_vrtn_mdl = Normal(1, 0.08)
+    dev_mdl.prm_mdl('v_th').init_mdl.latent_var('init_val').lot_vrtn_mdl = Normal(0, 0.0006)
+    dev_mdl.prm_mdl('v_th').mech_mdl('bti').latent_var('alpha').chp_vrtn_mdl = Normal(1, 0.01)
+    dev_mdl.prm_mdl('v_th').mech_mdl('hci').latent_var('alpha').chp_vrtn_mdl = Normal(1, 0.08)
 
     test_results[test_list[4]] = gerabaldi.simulate(htol_test, dev_mdl, test_env)
     test_results[test_list[5]] = gerabaldi.simulate(ltol_test, dev_mdl, test_env)
     test_results[test_list[3]] = gerabaldi.simulate(ramp_failure_test, dev_mdl, test_env)
-    print(f"Simulation time: {time.time() - start_time} seconds")
+    print(f"Simulation time: {t.time() - start_time} seconds")
 
     # Save the simulated results to JSON files for reuse if desired
     if save_files:
@@ -153,10 +154,10 @@ def simulate(save_files: dict = None):
     return {test: test_results[test] for test in test_list}
 
 
-def visualize(reports):
+def visualize(rprts):
     measured = {}
-    for sim in reports:
-        measured[sim] = reports[sim].measurements
+    for sim in rprts:
+        measured[sim] = rprts[sim].measurements
 
     # Reformat dataframe to get ready for plotting
     for sim in measured:
@@ -232,12 +233,12 @@ def visualize(reports):
 @click.option('--save-data', is_flag=True, default=False, help='If provided, simulated data will be saved to a JSON.')
 def entry(data_dir, save_data):
     if data_dir is not None:
-        reports = {TestSimReport(file=f"{data_dir}/{DATA_FILES[test]}.json") for test in DATA_FILES}
+        rprts = {TestSimReport(file=f"{data_dir}/{DATA_FILES[test]}.json") for test in DATA_FILES}
     else:
         data_files = {test: os.path.join(os.path.dirname(__file__), f"data/{DATA_FILES[test]}.json")
                       for test in DATA_FILES} if save_data else None
-        reports = simulate(save_files=data_files)
-    visualize(reports)
+        rprts = simulate(save_files=data_files)
+    visualize(rprts)
 
 
 if __name__ == '__main__':

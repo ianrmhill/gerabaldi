@@ -1,15 +1,10 @@
 # Copyright (c) 2023 Ian Hill
 # SPDX-License-Identifier: Apache-2.0
 
-import click
-import time
+import time as t
 from multiprocessing import Pool
 import numpy as np
 import pandas as pd
-import reliability as rel_lib
-import matplotlib.pyplot as plt
-import matplotlib.ticker as ticker
-import seaborn as sb
 
 import os
 import sys
@@ -18,8 +13,15 @@ import sys
 # installing it as a package from pip (which is undesirable because you would have to rebuild the package every time
 # you changed part of the code).
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-import gerabaldi
-from gerabaldi.models import *
+import gerabaldi # noqa: ImportNotAtTopOfFile
+from gerabaldi.models import * # noqa: ImportNotAtTopOfFile
+from gerabaldi.helpers import _on_demand_import # noqa: ImportNotAtTopOfFile
+
+click = _on_demand_import('click')
+plt = _on_demand_import('matplotlib.pyplot', 'matplotlib')
+ticker = _on_demand_import('matplotlib.ticker', 'matplotlib')
+sb = _on_demand_import('seaborn')
+rel_lib = _on_demand_import('reliability')
 
 DATA_FILES = {1.05: 'tddb_1.05_report', 1.075: 'tddb_1.075_report', 1.1: 'tddb_1.1_report',
               1.125: 'tddb_1.125_report', 1.15: 'tddb_1.15_report'}
@@ -38,7 +40,7 @@ def defect_generator_demo_model(time, temp, v_g, t_diel, c, bond_strength, therm
     return 1 if Uniform().sample() < prob else 0
 
 
-def oxide_failed(init, cond, threshold, defect0, defect1, defect2, defect3, defect4, defect5,
+def oxide_failed(init, cond, threshold, defect0, defect1, defect2, defect3, defect4, defect5, # noqa: UnusedParameter
                  defect6, defect7, defect8, defect9, defect10, defect11):
     # We physically model a transistor oxide layer with 12 possible defect locations
     layout = np.array([defect0, defect1, defect2, defect3, defect4, defect5,
@@ -70,10 +72,10 @@ def single_test(step_val, test):
     ### 3. Define the physical device model                              ###
     ########################################################################
     defect_mdl = FailMechMdl(defect_generator_demo_model,
-                               c=LatentVar(deter_val=4e-6),
-                               t_diel=LatentVar(deter_val=3),
-                               bond_strength=LatentVar(deter_val=200),
-                               thermal_dist=LatentVar(deter_val=step_val))  # <-- This is what we are schmooing
+                             c=LatentVar(deter_val=4e-6),
+                             t_diel=LatentVar(deter_val=3),
+                             bond_strength=LatentVar(deter_val=200),
+                             thermal_dist=LatentVar(deter_val=step_val))  # <-- This is what we are schmooing
     defect_dict = {'defect' + str(i): defect_mdl for i in range(0, 12)}
 
     tddb_model = DeviceMdl(DegPrmMdl(
@@ -90,7 +92,7 @@ def single_test(step_val, test):
     return gerabaldi.simulate(test, tddb_model, field_env)
 
 
-def simulate(save_files: str = None):
+def simulate(save_files: dict = None):
     """
     Demonstration of using Gerabaldi's support for hard failure mechanisms and arbitrary custom models to simulate TDDB
     failures using a custom-defined, non-algebraic model.
@@ -114,24 +116,24 @@ def simulate(save_files: str = None):
     ########################################################################
     ### 4. Simulate the test                                             ###
     ########################################################################
-    reports = []
-    start_time = time.time()
+    rprts = []
+    start_time = t.time()
     with Pool(processes=5) as pool:
         for test_out in pool.starmap(single_test, [(step, field_use_sim) for step in DATA_FILES]):
-            reports.append(test_out)
-    print(f"Simulation time: {time.time() - start_time} seconds")
+            rprts.append(test_out)
+    print(f"Simulation time: {t.time() - start_time} seconds")
 
     # Save the simulated results to JSON files for reuse if desired
     if save_files:
         for i, rep in enumerate(DATA_FILES):
-            reports[i].export_to_json(save_files[rep], 'hours')
-    return {rep: reports[i] for i, rep in enumerate(DATA_FILES)}
+            rprts[i].export_to_json(save_files[rep], 'hours')
+    return {rep: rprts[i] for i, rep in enumerate(DATA_FILES)}
 
 
-def visualize(reports):
+def visualize(rprts):
     fail_data = {}
-    for rep in reports:
-        fail_data[rep] = reports[rep].measurements
+    for rep in rprts:
+        fail_data[rep] = rprts[rep].measurements
     clr_map = {1.05: 'limegreen', 1.075: 'turquoise', 1.1: 'dodgerblue', 1.125: 'blueviolet', 1.15: 'maroon'}
     sb.set_theme(style='ticks', font='Times New Roman')
     plt.figure(figsize=(10, 6))
@@ -140,8 +142,8 @@ def visualize(reports):
     fails = []
     schmoos = []
     fail_event_data = pd.DataFrame()
-    for step in reports:
-        meas = reports[step].measurements
+    for step in rprts:
+        meas = rprts[step].measurements
         for sample in meas['device #'].unique():
             # Get measurements for only the one sample
             sample_meas = meas.loc[meas['device #'] == sample]
@@ -172,10 +174,10 @@ def visualize(reports):
             observed['time'].tolist(), right_censored=unobserved['time'].tolist(), quantiles=True,
             print_results=False, show_probability_plot=True, color=clr_map[prm_val],
             label=f"$\\alpha$ = {prm_val}")
-        qntile = fits[prm_val].quantiles.loc[0]
-        print(f"{prm_val}: 95% CI of <1% transistors failing: {qntile['Lower Estimate']} hours")
+        quantile = fits[prm_val].quantiles.loc[0]
+        print(f"{prm_val}: 95% CI of <1% transistors failing: {quantile['Lower Estimate']} hours")
         x[i][0] = prm_val
-        y[i] = qntile['Lower Estimate']
+        y[i] = quantile['Lower Estimate']
 
     plt.axvline(2 * 8.736e4, color='black', linestyle='dashed', label='Simulation Stop Point')
     plt.text(0.9, 0.15, 'Simulation Stop: 20 Years', ha='center', color='black',
@@ -198,12 +200,12 @@ def visualize(reports):
 @click.option('--save-data', is_flag=True, default=False, help='If provided, simulated data will be saved to a JSON.')
 def entry(data_dir, save_data):
     if data_dir is not None:
-        reports = {TestSimReport(file=f"{data_dir}/{DATA_FILES[test]}.json") for test in DATA_FILES}
+        rprts = {TestSimReport(file=f"{data_dir}/{DATA_FILES[test]}.json") for test in DATA_FILES}
     else:
         data_files = {test: os.path.join(os.path.dirname(__file__), f"data/{DATA_FILES[test]}.json")
                       for test in DATA_FILES} if save_data else None
-        reports = simulate(save_files=data_files)
-    visualize(reports)
+        rprts = simulate(save_files=data_files)
+    visualize(rprts)
 
 
 if __name__ == '__main__':

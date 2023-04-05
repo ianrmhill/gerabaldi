@@ -1,6 +1,9 @@
-"""Tests for the classes that provide the effects of the physical test environment and measuring devices used."""
+# Copyright (c) 2023 Ian Hill
+# SPDX-License-Identifier: Apache-2.0
 
-import pytest
+"""Tests for the classes that provide the effects of the physical test environment and measuring devices used"""
+
+import pytest # noqa: PackageNotInRequirements
 import numpy as np
 import pandas as pd
 
@@ -116,7 +119,7 @@ def test_physical_test_environment(sequential_var):
     env_conds = env.gen_env_cond_vals({'a': 4, 'b': 10}, ['bti', 'hci'], report, dev_mdl)
     assert np.allclose(env_conds['bti']['a'], np.array([[[5.6, 5.7], [6.8, 6.9]]]))
     assert np.allclose(env_conds['hci']['a'], np.array([[[5.6, 5.7, 5.8], [6.9, 7.0, 7.1]]]))
-    assert not 'b' in env_conds['hci']
+    assert 'b' not in env_conds['hci']
     env.vrtn_mdl('b').batch_vrtn_mdl = sequential_var(2, 1)
     env.vrtn_mdl('b').chp_vrtn_mdl = sequential_var(0.5, 0.5)
     env.vrtn_mdl('b').dev_vrtn_mdl = sequential_var(0.1, 0.1)
