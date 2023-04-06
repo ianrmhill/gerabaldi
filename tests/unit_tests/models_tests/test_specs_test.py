@@ -1,6 +1,9 @@
-"""Tests that ensure the effective description and execution of test specifications are correctly implemented."""
+# Copyright (c) 2023 Ian Hill
+# SPDX-License-Identifier: Apache-2.0
 
-import pytest
+"""Tests that ensure the effective description and execution of test specifications are correctly implemented"""
+
+import pytest # noqa: PackageNotInRequirements
 from datetime import timedelta
 
 from gerabaldi.models import MeasSpec, StrsSpec, TestSpec
@@ -28,7 +31,7 @@ def test_strs_spec():
     assert spec.duration == timedelta(hours=40)
     # Test 0 duration error handling
     with pytest.raises(UserConfigError):
-        spec = StrsSpec({'temp': 50}, duration=0)
+        _ = StrsSpec({'temp': 50}, duration=0)
 
 
 def test_test_spec():
@@ -56,7 +59,7 @@ def test_test_spec():
 
     # Now add non-default values
     meas2 = MeasSpec({'delay': 15, 'current': 2}, {'temp': 100}, 'GenericMeas2')
-    test = TestSpec([meas, stress, meas], 2, 3, 'This test has non-default arguments', 'Good Fun')
+    test = TestSpec([meas, stress, meas], 2, 3, 'Good Fun', 'This test has non-default arguments')
     test.append_steps(meas2)
     assert (test.num_chps, test.num_lots) == (2, 3)
     assert test.description == 'This test has non-default arguments'

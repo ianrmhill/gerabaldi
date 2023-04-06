@@ -1,11 +1,7 @@
 # Copyright (c) 2023 Ian Hill
 # SPDX-License-Identifier: Apache-2.0
 
-import click
 import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.ticker as ticker
-import seaborn as sb
 
 import os
 import sys
@@ -14,8 +10,14 @@ import sys
 # installing it as a package from pip (which is undesirable because you would have to rebuild the package every time
 # you changed part of the code).
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-import gerabaldi
-from gerabaldi.models import *
+import gerabaldi # noqa: ImportNotAtTopOfFile
+from gerabaldi.models import * # noqa: ImportNotAtTopOfFile
+from gerabaldi.helpers import _on_demand_import # noqa: ImportNotAtTopOfFile
+
+click = _on_demand_import('click')
+plt = _on_demand_import('matplotlib.pyplot', 'matplotlib')
+ticker = _on_demand_import('matplotlib.ticker', 'matplotlib')
+sb = _on_demand_import('seaborn')
 
 DATA_FILE_NAME = 'erosion_report'
 SECONDS_PER_HOUR = 3600
@@ -68,14 +70,14 @@ def simulate(save_file: str = None):
     def riverbed_level(init, erosion, cond):
         return init - erosion + cond
 
-    river_mdl = DeviceModel(DegradedParamModel(
+    river_mdl = DeviceMdl(DegPrmMdl(
         prm_name='riverbed_level',
         deg_mech_mdls={
-            'erosion': DegMechModel(
+            'erosion': DegMechMdl(
                 fluvial_erosion_riverbed, k_d=LatentVar(deter_val=1e-5),
                 tau_c=LatentVar(Normal(2.4, 0.02), Normal(1, 0.2)), alpha=LatentVar(Normal(0.9, 0.01), Normal(1, 0.04)),
             )},
-        init_val_mdl=InitValModel(init_val=LatentVar(dev_vrtn_mdl=Normal(-2, 0.01), chp_vrtn_mdl=Normal(1, 0.02))),
+        init_val_mdl=InitValMdl(init_val=LatentVar(dev_vrtn_mdl=Normal(-2, 0.01), chp_vrtn_mdl=Normal(1, 0.02))),
         compute_eqn=riverbed_level,
         array_computable=False
     ))
@@ -98,7 +100,7 @@ def visualize(report):
     measured = measured.set_index(['param', 'device #', 'chip #'])
     measured = measured.sort_index()
     measured = measured.drop('lot #', axis=1)
-    # Change timedeltas to hours then years for processing
+    # Change time deltas to hours then years for processing
     measured['time'] = measured['time'].apply(lambda time, **kwargs: time.total_seconds() / SECONDS_PER_HOUR, axis=1)
     measured['time'] = measured['time'] / HOURS_PER_YEAR
 
@@ -112,8 +114,8 @@ def visualize(report):
     colour_map = ['mediumpurple', 'green', 'cornflowerblue', 'aqua', 'limegreen']
     for rvr in range(RIVERS_SAMPLED):
         avg = np.zeros(11)
-        max = np.full(11, -1000)
-        min = np.full(11, 1000)
+        max_val = np.full(11, -1000)
+        min_val = np.full(11, 1000)
         times = measured.loc['riverbed_level', 0, 0]['time']
 
         for smpl in range(SAMPLES_PER_RIVER):
@@ -123,12 +125,12 @@ def visualize(report):
             # Also plot the average level for each time in each river, along with the spread of values
             vals = meas.reset_index()['measured']
             avg += vals
-            max = np.maximum(max, vals)
-            min = np.minimum(min, vals)
+            max_val = np.maximum(max_val, vals)
+            min_val = np.minimum(min_val, vals)
 
         avg = avg / SAMPLES_PER_RIVER
         p2.plot(times, avg, color=colour_map[rvr])
-        p2.fill_between(times, min, max, color=colour_map[rvr], alpha=0.2)
+        p2.fill_between(times, min_val, max_val, color=colour_map[rvr], alpha=0.2)
 
     p1.set(ylabel='Riverbed Level Below Ref (metres)', xlabel='Elapsed Time (years)',
            title='Riverbed Erosion in Five Glacier-Fed Streams')

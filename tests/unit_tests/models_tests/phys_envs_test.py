@@ -1,6 +1,9 @@
-"""Tests for the classes that provide the effects of the physical test environment and measuring devices used."""
+# Copyright (c) 2023 Ian Hill
+# SPDX-License-Identifier: Apache-2.0
 
-import pytest
+"""Tests for the classes that provide the effects of the physical test environment and measuring devices used"""
+
+import pytest # noqa: PackageNotInRequirements
 import numpy as np
 import pandas as pd
 
@@ -18,7 +21,7 @@ def test_measurement_device():
     assert np.array_equal(dev.measure(np.array([4, 6.3])), np.array([4, 6.3]))
     assert dev.measure(pd.Series([-1, 5.2])).equals(pd.Series([-1, 5.2]))
     # Now test the unideal aspects
-    dev = MeasInstrument('For Testing', 3, Gamma(0.5, 2, test_seed=3985), (0, 4))
+    dev = MeasInstrument('For Testing', 3, Gamma(0.5, 0.5, test_seed=3985), (0, 4))
     assert dev.name == 'For Testing'
     assert np.array_equal(dev.measure(np.array([-2.4, 1, 1.2345, 6, 3])), np.array([0, 2.58, 1.93, 4, 3.13]))
     # Finally, test the miserable values to handle in the fancy significant figures math
@@ -84,7 +87,7 @@ def test_physical_test_environment(sequential_var):
 
     # Now test non-defaults model and instrument use
     env = PhysTestEnv({'a': EnvVrtnMdl(dev_vrtn_mdl=Normal(0, 2, test_seed=5746)),
-                       'b': EnvVrtnMdl(dev_vrtn_mdl=Gamma(1, 3, test_seed=4635))},
+                       'b': EnvVrtnMdl(dev_vrtn_mdl=Gamma(1, 1/3, test_seed=4635))},
                       {'b': MeasInstrument(precision=2)}, 'Test Env')
     assert env.name == 'Test Env'
     assert env.meas_instm('b').measure(4.3674) == 4.4
@@ -108,15 +111,15 @@ def test_physical_test_environment(sequential_var):
     def hci_func(time, a, y):
         return (time / a) * y
 
-    dev_mdl = DeviceModel({
-        'bti': DegradedParamModel(DegMechModel(bti_func, mdl_name='deg'), cond_shift_mdl=CondShiftModel(cond_func)),
-        'hci': DegradedParamModel(DegMechModel(hci_func, mdl_name='deg2'))})
+    dev_mdl = DeviceMdl({
+        'bti': DegPrmMdl(DegMechMdl(bti_func, mdl_name='deg'), cond_shift_mdl=CondShiftMdl(cond_func)),
+        'hci': DegPrmMdl(DegMechMdl(hci_func, mdl_name='deg2'))})
     test_spec = TestSpec([MeasSpec({'bti': 2, 'hci': 3, 'b': 2}, {'a': 13, 'b': 7})], num_chps=2, num_lots=1)
     report = TestSimReport(test_spec)
     env_conds = env.gen_env_cond_vals({'a': 4, 'b': 10}, ['bti', 'hci'], report, dev_mdl)
     assert np.allclose(env_conds['bti']['a'], np.array([[[5.6, 5.7], [6.8, 6.9]]]))
     assert np.allclose(env_conds['hci']['a'], np.array([[[5.6, 5.7, 5.8], [6.9, 7.0, 7.1]]]))
-    assert not 'b' in env_conds['hci']
+    assert 'b' not in env_conds['hci']
     env.vrtn_mdl('b').batch_vrtn_mdl = sequential_var(2, 1)
     env.vrtn_mdl('b').chp_vrtn_mdl = sequential_var(0.5, 0.5)
     env.vrtn_mdl('b').dev_vrtn_mdl = sequential_var(0.1, 0.1)
