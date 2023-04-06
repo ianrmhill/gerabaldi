@@ -28,8 +28,10 @@ DATA_FILES = {1.05: 'tddb_1.05_report', 1.075: 'tddb_1.075_report', 1.1: 'tddb_1
 
 CELSIUS_TO_KELVIN = 273.15
 SECONDS_PER_HOUR = 3600
+
 TEST_LEN = 24 * 7 * 52 * 20
 NUM_SAMPLES = 1000
+C_LATENT = 4e-6
 
 
 def defect_generator_demo_model(time, temp, v_g, t_diel, c, bond_strength, thermal_dist):
@@ -72,7 +74,7 @@ def single_test(step_val, test):
     ### 3. Define the physical device model                              ###
     ########################################################################
     defect_mdl = FailMechMdl(defect_generator_demo_model,
-                             c=LatentVar(deter_val=4e-6),
+                             c=LatentVar(deter_val=C_LATENT),
                              t_diel=LatentVar(deter_val=3),
                              bond_strength=LatentVar(deter_val=200),
                              thermal_dist=LatentVar(deter_val=step_val))  # <-- This is what we are schmooing
