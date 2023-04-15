@@ -31,18 +31,19 @@ interfaces and visualization of results. These can be run directly if you have c
 installed the packaged version it is easiest to copy-paste the source code from Github (you will want to remove the
 automated path add code at the very top of the demo file as the 'gerabaldi' import should already work without it).
 
-Note that the VTS paper demos will take a significant amount of time to run due to the size of the simulations, these
-can be reduced by changing the three globals near the tops of the files as follows:
+Note that the VTS paper demos will require modification and take a significant amount of time to obtain the exact
+results shown due to the size of the simulations, to run the full simulations change the three globals near the tops of
+the files as follows:
 
-For demo 1:
-`NUM_SAMPLES = 5`
-`NUM_DEVICES = 5`
-`NUM_LOTS = 5`
+For demo 1 (pre-silicon variability analysis):
+`NUM_DEVICES = 10`
+`NUM_CHIPS = 10`
+`NUM_LOTS = 10`
 
-For demo 2:
-`TEST_LEN = 24 * 7 * 52 * 2`
-`NUM_SAMPLES = 100`
-`C_LATENT = 4e-5`
+For demo 2 (TDDB model sensitivity):
+`TEST_LEN = 24 * 7 * 52 * 20`
+`NUM_SAMPLES = 1000`
+`C_LATENT = 4e-6`
 
 Running the simulations with these values will provide similar-looking results but with far less computation and is
 useful for quickly seeing these more complex simulations in action.

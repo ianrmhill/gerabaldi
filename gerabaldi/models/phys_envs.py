@@ -3,6 +3,8 @@
 
 """Classes for defining physical noise sources and measurement capabilities in a test environment."""
 
+from __future__ import annotations
+
 from math import floor, log10
 import numpy as np
 import pandas as pd

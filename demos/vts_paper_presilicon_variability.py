@@ -29,12 +29,13 @@ CELSIUS_TO_KELVIN = 273.15
 BOLTZMANN_CONST_EV = 8.617e-5
 SECONDS_PER_HOUR = 3600
 
-NUM_SAMPLES = 10
-NUM_DEVICES = 10
-NUM_LOTS = 10
+# To obtain results shown in the VTS paper, set NUM_DEVICES = 10, NUM_CHIPS = 10, NUM_LOTS = 10
+NUM_DEVICES = 5
+NUM_CHIPS = 5
+NUM_LOTS = 5
 
 
-def simulate(save_files: dict = None):
+def run_simulation(save_files: dict = None):
     """
     Demonstration of using Gerabaldi's layered stochastic model and fully-featured device model to degrade circuit
     parameters at the circuit level affected by multiple underlying mechanisms and show how fabrication process
@@ -44,21 +45,21 @@ def simulate(save_files: dict = None):
     ########################################################################
     ### 1. Define the tests to simulate                                  ###
     ########################################################################
-    full_meas = MeasSpec({'amp_gain': NUM_SAMPLES}, {'temp': 30 + CELSIUS_TO_KELVIN, 'vdd': 0.86}, 'Measure All')
+    full_meas = MeasSpec({'amp_gain': NUM_DEVICES}, {'temp': 30 + CELSIUS_TO_KELVIN, 'vdd': 0.86}, 'Measure All')
 
     # First is a standard HTOL test
     htol_stress = StrsSpec({'temp': 125 + CELSIUS_TO_KELVIN, 'vdd': 0.92}, 50, 'HTOL Stress')
-    htol_test = TestSpec([full_meas], NUM_DEVICES, NUM_LOTS, name='HTOL Similar Test')
+    htol_test = TestSpec([full_meas], NUM_CHIPS, NUM_LOTS, name='HTOL Similar Test')
     htol_test.append_steps([htol_stress, full_meas], loop_for_duration=1000)
 
     # Second is a low temperature test
     ltol_stress = StrsSpec({'temp': -10 + CELSIUS_TO_KELVIN, 'vdd': 0.92}, 50, 'Low Temperature Stress')
-    ltol_test = TestSpec([full_meas], NUM_DEVICES, NUM_LOTS, name='LTOL Similar Test')
+    ltol_test = TestSpec([full_meas], NUM_CHIPS, NUM_LOTS, name='LTOL Similar Test')
     ltol_test.append_steps([ltol_stress, full_meas], loop_for_duration=1000)
 
     # Third is a more complex test to showcase the rich test support of the simulator
     ramp_cycle_relax_interval = StrsSpec({'temp': 30 + CELSIUS_TO_KELVIN, 'vdd': 0.86}, 10, 'Ramp Cycle Relax')
-    ramp_failure_test = TestSpec([full_meas], NUM_DEVICES, NUM_LOTS, name='Ramp to Failure Test')
+    ramp_failure_test = TestSpec([full_meas], NUM_CHIPS, NUM_LOTS, name='Ramp to Failure Test')
     for i in range(10):
         cycle_stress = StrsSpec(
             {'temp': 100 + (10 * i) + CELSIUS_TO_KELVIN, 'vdd': 0.88 + (0.02 * i)}, 90, f"Ramp Cycle Stress {i + 1}")
@@ -182,8 +183,8 @@ def visualize(rprts):
             final[sim] = []
 
     for lot in range(NUM_LOTS):
-        for dev in range(NUM_DEVICES):
-            for ind in range(NUM_SAMPLES):
+        for dev in range(NUM_CHIPS):
+            for ind in range(NUM_DEVICES):
                 for sim in measured:
                     meas = measured[sim].loc[('amp_gain', ind, dev, lot)].reset_index()['measured']
                     maxs[sim] = np.maximum(maxs[sim], meas)
@@ -197,7 +198,7 @@ def visualize(rprts):
                   'Current Process: LTOL': 'navy', 'New Process: Ramped Cycling': 'plum',
                   'New Process: HTOL': 'lightgreen', 'New Process: LTOL': 'aqua'}
     for sim in measured:
-        avgs[sim] /= NUM_SAMPLES * NUM_DEVICES * NUM_LOTS
+        avgs[sim] /= NUM_DEVICES * NUM_CHIPS * NUM_LOTS
         p1.plot(times[sim], avgs[sim], color=colour_map[sim], label=sim)
         p1.fill_between(times[sim], mins[sim], maxs[sim], color=colour_map[sim], alpha=0.2)
 
@@ -237,7 +238,7 @@ def entry(data_dir, save_data):
     else:
         data_files = {test: os.path.join(os.path.dirname(__file__), f"data/{DATA_FILES[test]}.json")
                       for test in DATA_FILES} if save_data else None
-        rprts = simulate(save_files=data_files)
+        rprts = run_simulation(save_files=data_files)
     visualize(rprts)
 
 

@@ -24,7 +24,7 @@ SECONDS_PER_HOUR = 3600
 NUM_DEVICES = 5
 
 
-def simulate(save_file: str = None):
+def run_simulation(save_file: str = None):
     """
     Demonstration of the simplest use of Gerabaldi, useful as a template and starting point for building your own sims.
     """
@@ -32,7 +32,7 @@ def simulate(save_file: str = None):
     ########################################################################
     ### 1. Define the test to simulate                                   ###
     ########################################################################
-    meas_spec = MeasSpec({'example': NUM_DEVICES}, {'temp': 25 + CELSIUS_TO_KELVIN})
+    meas_spec = MeasSpec({'example_prm': NUM_DEVICES}, {'temp': 25 + CELSIUS_TO_KELVIN})
     strs_spec = StrsSpec({'temp': 125 + CELSIUS_TO_KELVIN}, 100)
     test_spec = TestSpec([meas_spec, strs_spec, meas_spec])
 
@@ -47,7 +47,7 @@ def simulate(save_file: str = None):
     def ex_eqn(time, temp, a):
         return time * -a * temp
     dev_mdl = DeviceMdl(
-        {'example': DegPrmMdl(
+        {'example_prm': DegPrmMdl(
             {'linear': DegMechMdl(ex_eqn, a=LatentVar(Normal(1e-3, 2e-4)))})})
 
     ########################################################################
@@ -76,7 +76,7 @@ def visualize(report):
     measured = measured.set_index(['param', 'device #'])
     measured = measured.sort_index()
     for smpl in range(NUM_DEVICES):
-        meas = measured.loc[('example', smpl)]
+        meas = measured.loc[('example_prm', smpl)]
         p1.plot(meas['time'], meas['measured'], color=colours[smpl])
 
     # Set some plot properties for a clean look
@@ -93,7 +93,7 @@ def entry(data_file, save_data):
         report = TestSimReport(file=data_file)
     else:
         data_file = os.path.join(os.path.dirname(__file__), f"data/{DATA_FILE_NAME}.json") if save_data else None
-        report = simulate(save_file=data_file)
+        report = run_simulation(save_file=data_file)
     visualize(report)
 
 

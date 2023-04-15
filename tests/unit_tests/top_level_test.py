@@ -65,18 +65,20 @@ def test_sim_stress_step_basic():
     report = TestSimReport(test_spec)
 
     # Run the function being tested
-    _sim_stress_step(stress_step, phys_state, deg_model, test_env, report)
+    _sim_stress_step(stress_step, phys_state, deg_model, test_env, report, 1)
 
     # Check types and returned values
     assert type(phys_state) == TestSimState
     assert round(phys_state.elapsed.total_seconds() / SECONDS_PER_HOUR, 2) == 20.00
     assert round(phys_state.curr_prm_vals['current'][0][1][2], 5) == 0.00556
-    assert report.stress_summary['stress step'][0] == 'unspecified'
-    assert report.stress_summary['temp'][0] == 125
+    assert report.test_summary['step name'][0] == 'unspecified'
+    assert report.test_summary['step type'][0] == 'stress'
+    assert report.test_summary['step number'][0] == 1
+    assert report.test_summary['temp'][0] == 125
 
     # Run again to check that the equivalent time back-calculations are working fine
-    _sim_stress_step(stress_step, phys_state, deg_model, test_env, report)
-    assert report.stress_summary['duration'][1] == timedelta(hours=20)
+    _sim_stress_step(stress_step, phys_state, deg_model, test_env, report, 2)
+    assert report.test_summary['duration'][1] == timedelta(hours=20)
     assert round(phys_state.curr_prm_vals['current'][0][1][2], 5) == 0.00570
 
 
@@ -103,13 +105,17 @@ def test_sim_meas_step_basic(sequential_var):
     deg_state = gerabaldi.gen_init_state(sim_model, dev_counts={'current': 10}, elapsed_time=10, num_chps=2)
     report = TestSimReport(test_spec)
 
-    _sim_meas_step(meas_step, deg_state, sim_model, test_env, report)
+    _sim_meas_step(meas_step, deg_state, sim_model, test_env, report, 3)
     assert type(report.measurements) == pd.DataFrame
     assert np.round(report.measurements['measured'][0], 5) == 120
     assert report.measurements['param'][0] == 'temp'
     assert np.round(report.measurements['measured'][2], 5) == 1.051
     assert report.measurements['chip #'][16] == 1
+    assert report.measurements['step #'][16] == 3
     assert np.round(report.measurements['measured'][12], 5) == 1.183
+    assert report.test_summary['step name'][0] == 'test_meas_spec'
+    assert report.test_summary['step type'][0] == 'measure'
+    assert report.test_summary['step number'][0] == 3
 
 
 def test_wearout_test_sim_basic():
@@ -132,7 +138,7 @@ def test_wearout_test_sim_basic():
     report = gerabaldi.simulate(test, deg_model, test_env, init_state)
     assert type(report) == TestSimReport
     assert len(report.measurements['param']) == 57
-    assert len(report.stress_summary['stress step']) == 2
+    assert len(report.test_summary['step number']) == 5
     assert round(report.measurements['measured'][40], 5) == 0.00560
     assert round(report.measurements['measured'][26], 5) == 0.00783
 

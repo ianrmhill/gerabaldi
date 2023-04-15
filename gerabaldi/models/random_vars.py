@@ -4,6 +4,8 @@
 """Custom generators for random variables used for experiment simulation and model specification. Necessary as the Numpy
 and PyMC RVs either cannot be persisted or futz about with tensor types."""
 
+from __future__ import annotations
+
 import numpy as np
 
 from gerabaldi.helpers import _on_demand_import
@@ -33,15 +35,14 @@ class RandomVar:
             self._generator = getattr(np.random.default_rng(), self._dist_type)
 
     def _get_dist_params(self, target: str = 'pymc'):
-        match target:
-            case 'pymc':
-                return self._params_for_pymc()
-            case 'numpy':
-                return self._params_for_numpy()
-            case 'pyro':
-                return self._params_for_pyro()
-            case _:
-                raise NotImplementedError(f"Invalid target library {target} requested.")
+        if target == 'pymc':
+            return self._params_for_pymc()
+        elif target == 'numpy':
+            return self._params_for_numpy()
+        elif target == 'pyro':
+            return self._params_for_pyro()
+        else:
+            raise NotImplementedError(f"Invalid target library {target} requested.")
 
     def sample(self, quantity: int = 1) -> np.ndarray:
         """
