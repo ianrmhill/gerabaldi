@@ -29,9 +29,10 @@ DATA_FILES = {1.05: 'tddb_1.05_report', 1.075: 'tddb_1.075_report', 1.1: 'tddb_1
 CELSIUS_TO_KELVIN = 273.15
 SECONDS_PER_HOUR = 3600
 
-TEST_LEN = 24 * 7 * 52 * 20
-NUM_SAMPLES = 1000
-C_LATENT = 4e-6
+# To obtain results shown in the VTS paper, set TEST_LEN = 24 * 7 * 52 * 20, NUM_SAMPLES = 1000, C_LATENT = 4e-6
+TEST_LEN = 24 * 7 * 52 * 2
+NUM_SAMPLES = 100
+C_LATENT = 4e-5
 
 
 def defect_generator_demo_model(time, temp, v_g, t_diel, c, bond_strength, thermal_dist):
@@ -94,7 +95,7 @@ def single_test(step_val, test):
     return gerabaldi.simulate(test, tddb_model, field_env)
 
 
-def simulate(save_files: dict = None):
+def run_simulation(save_files: dict = None):
     """
     Demonstration of using Gerabaldi's support for hard failure mechanisms and arbitrary custom models to simulate TDDB
     failures using a custom-defined, non-algebraic model.
@@ -206,7 +207,7 @@ def entry(data_dir, save_data):
     else:
         data_files = {test: os.path.join(os.path.dirname(__file__), f"data/{DATA_FILES[test]}.json")
                       for test in DATA_FILES} if save_data else None
-        rprts = simulate(save_files=data_files)
+        rprts = run_simulation(save_files=data_files)
     visualize(rprts)
 
 

@@ -3,6 +3,8 @@
 
 """Classes for defining degradation models for tuning or use in simulating wear-out tests"""
 
+from __future__ import annotations
+
 import inspect
 import numpy as np
 from scipy.optimize import minimize_scalar
@@ -92,17 +94,18 @@ class LatentVar:
     def __setattr__(self, name, value):
         if name == 'name':
             # Need to also update the naming of the probabilistic distributions to have CBI export work correctly
-            if self._dev_vrtns and not self.dev_vrtn_mdl.name:
-                # Set the distribution name to be the variable name + '_dev' suffix, unless the device variation model
-                # fully specifies the variable value, in which case don't add the suffix
-                if not self._chp_vrtns and not self._lot_vrtns and not self._dev_vrtns:
-                    self.dev_vrtn_mdl.name = name
-                else:
-                    self.dev_vrtn_mdl.name = name + '_dev'
-            if self._chp_vrtns:
-                self.chp_vrtn_mdl.name = name + '_chp'
-            if self._chp_vrtns:
-                self.lot_vrtn_mdl.name = name + '_lot'
+            if value is not None:
+                if self._dev_vrtns:
+                    # Set the distribution name to be the variable name + '_dev' suffix, unless the device variation
+                    # model fully specifies the variable value, in which case don't add the suffix
+                    if not self._chp_vrtns and not self._lot_vrtns:
+                        self.dev_vrtn_mdl.name = value
+                    else:
+                        self.dev_vrtn_mdl.name = value + '_dev'
+                if self._chp_vrtns:
+                    self.chp_vrtn_mdl.name = value + '_chp'
+                if self._lot_vrtns:
+                    self.lot_vrtn_mdl.name = value + '_lot'
         if name == 'vrtn_type':
             # If changing the variation type we need to also update all the attributes that are used to compute values
             if value not in ['scaling', 'offset']:
@@ -246,7 +249,7 @@ class LatentMdl:
         self.latent_vars = []
         for var in latent_vars:
             # If no name was specified for the latent variable, nice to set it to the same name as used in the model
-            if not latent_vars[var].name:
+            if latent_vars[var].name == '' or not latent_vars[var].name:
                 latent_vars[var].name = var
             # Indicate the latent variable attributes as private since they're supposed to be uncertain
             setattr(self, f"_latent_{var}", latent_vars[var])
@@ -324,7 +327,7 @@ class LatentMdl:
         if target_framework == 'pymc':
             return pymc.Normal(name=self.name, mu=computed, sigma=1, observed=observed[self.name])
         elif target_framework == 'pyro':
-            return pyro.sample(self.name, dist.Normal(computed, 1), obs=observed[self.name])
+            return pyro.sample(self.name, dist.Normal(computed, 0.1), obs=observed[self.name]).to_event(1)
 
 
 class MechMdl(LatentMdl):
@@ -808,7 +811,8 @@ class DegPrmMdl(LatentMdl):
         for mech in self.mech_mdl_list:
             latents[mech] = self.mech_mdl(mech).gen_latent_vals(num_devs, num_chps, num_lots)
         # The degraded parameter compute equation can have its own latent variables if desired, merge those if so
-        return latents | super().gen_latent_vals(num_devs, num_chps, num_lots)
+        latents.update(super().gen_latent_vals(num_devs, num_chps, num_lots))
+        return latents
 
     def gen_init_mech_vals(self, num_devs: int = 1, num_chps: int = 1, num_lots: int = 1) -> dict:
         """

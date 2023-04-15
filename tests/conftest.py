@@ -3,6 +3,8 @@
 
 """Helper classes and functions to improve testing of stochastic methods."""
 
+from __future__ import annotations
+
 import pytest # noqa: PackageNotInRequirements
 import numpy as np
 

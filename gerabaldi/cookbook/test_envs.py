@@ -39,7 +39,7 @@ def volt_and_temp_env() -> PhysTestEnv:
 
     # Voltmeter shows to nearest mV, noise error offsets of 0.2mV, range of 0V to 12V
     volt_meas = MeasInstrument(precision=3, error=Normal(0, 0.0002), meas_lims=(0, 12), name='Basic Voltmeter')
-    # Temperature shows to nearest hundreths of a degree, error offset of 0.2K and converts to Celsius, range -40 to 180
+    # Temperature to nearest hundredths of a degree, error offset of 0.2K and converts to Celsius, range -40 to 180
     temp_meas = MeasInstrument(precision=2, error=Normal(-273.15, 0.2), meas_lims=(-40, 180), name='Basic Temp Sensor')
 
     return PhysTestEnv(env_vrtns={'temp': temp_vrtns, 'vdd': volt_vrtns},

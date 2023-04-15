@@ -27,7 +27,7 @@ SAMPLES_PER_RIVER = 10
 RIVERS_SAMPLED = 5
 
 
-def simulate(save_file: str = None):
+def run_simulation(save_file: str = None):
     """
     Demonstration of using Gerabaldi's advanced stochastic model and degradation model agnosticism to simulate
     degradation of other processes beyond integrated circuits; in this case fluvial erosion in rivers.
@@ -37,13 +37,14 @@ def simulate(save_file: str = None):
     ### 1. Define the fluvial erosion stress and monitoring process/test ###
     ########################################################################
     # Note that 'tau' is the shear stress due to the flow of river water over the soil bed
+    # We will measure/sample 10 individual locations in the river for each measurement
     erosion_meas = MeasSpec({'riverbed_level': SAMPLES_PER_RIVER}, {'tau': 3}, 'Bed Height Sampling')
     # Each stress phase lasts a quarter of a year
     summer_strs = StrsSpec({'tau': 4}, HOURS_PER_YEAR / 4, 'Summer Season Flow')
     autumn_strs = StrsSpec({'tau': 2}, HOURS_PER_YEAR / 4, 'Autumn Season Flow')
     winter_strs = StrsSpec({'tau': 2}, HOURS_PER_YEAR / 4, 'Winter Season Flow')
     spring_strs = StrsSpec({'tau': 7}, HOURS_PER_YEAR / 4, 'Spring Season Flow')
-    # We will measure 20 individual locations in 5 different rivers for 10 years
+    # We will monitor 5 different rivers for 10 years
     ten_year_test = TestSpec([erosion_meas], RIVERS_SAMPLED, 1, name='Riverbed Erosion Process')
     ten_year_test.append_steps([spring_strs, summer_strs, autumn_strs, winter_strs, erosion_meas], HOURS_PER_YEAR * 10)
 
@@ -74,8 +75,10 @@ def simulate(save_file: str = None):
         prm_name='riverbed_level',
         deg_mech_mdls={
             'erosion': DegMechMdl(
-                fluvial_erosion_riverbed, k_d=LatentVar(deter_val=1e-5),
-                tau_c=LatentVar(Normal(2.4, 0.02), Normal(1, 0.2)), alpha=LatentVar(Normal(0.9, 0.01), Normal(1, 0.04)),
+                fluvial_erosion_riverbed,
+                k_d=LatentVar(deter_val=1e-5),
+                tau_c=LatentVar(Normal(2.4, 0.02), Normal(1, 0.2)),
+                alpha=LatentVar(Normal(0.9, 0.01), Normal(1, 0.04)),
             )},
         init_val_mdl=InitValMdl(init_val=LatentVar(dev_vrtn_mdl=Normal(-2, 0.01), chp_vrtn_mdl=Normal(1, 0.02))),
         compute_eqn=riverbed_level,
@@ -150,7 +153,7 @@ def entry(data_file, save_data):
         report = TestSimReport(file=data_file)
     else:
         data_file = os.path.join(os.path.dirname(__file__), f"data/{DATA_FILE_NAME}.json") if save_data else None
-        report = simulate(save_file=data_file)
+        report = run_simulation(save_file=data_file)
     visualize(report)
 
 

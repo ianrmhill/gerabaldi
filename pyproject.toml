@@ -3,7 +3,7 @@ requires = ["setuptools>=66.0"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-packages = ["gerabaldi"]
+packages = ["gerabaldi", "gerabaldi.models", "gerabaldi.cookbook"]
 
 [project]
 name = "gerabaldi"
@@ -13,7 +13,7 @@ authors = [
 ]
 description = "A temporal simulator for probabilistic degradation and failure processes with a focus on integrated circuit wear-out "
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.7"
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: Apache Software License",

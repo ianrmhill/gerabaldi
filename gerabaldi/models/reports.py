@@ -3,6 +3,8 @@
 
 """Custom classes for reporting results of Gerabaldi simulations"""
 
+from __future__ import annotations
+
 import json
 import pandas as pd
 import numpy as np
@@ -36,8 +38,8 @@ class TestSimReport:
         The quantity of lots in the simulation
     measurements: pandas.DataFrame
         A tabular data structure with all the simulated measurements of device parameters conducted during the test
-    stress_summary: pandas.DataFrame
-        A tabular data structure that explains the stress conditions used during the test
+    test_summary: pandas.DataFrame
+        A tabular data structure that explains the stress and measure conditions used during the test
     """
 
     def __init__(self, test_spec: TestSpec = None, name: str = None, description: str = None, file: str = None):
@@ -60,7 +62,7 @@ class TestSimReport:
             self.num_chps, self.num_lots = test_spec.num_chps, test_spec.num_lots
             self.dev_counts = test_spec.calc_samples_needed()
             self.measurements = pd.DataFrame()
-            self.stress_summary = pd.DataFrame()
+            self.test_summary = pd.DataFrame()
         # Can also load existing test data from a file
         elif file:
             if file:
@@ -73,23 +75,23 @@ class TestSimReport:
             self.test_name = report_json['Test Name']
             self.test_description = report_json['Description']
             self.measurements = pd.read_json(report_json['Measurements'])
-            self.stress_summary = pd.read_json(report_json['Stress Summary'])
+            self.test_summary = pd.read_json(report_json['Test Summary'])
             # Convert the times back to time deltas
             units = report_json['Time Units'].lower()
             self.measurements['time'] = self.measurements['time'].apply(_convert_time, units=units, axis=1)
-            self.stress_summary['start time'] = self.stress_summary['start time'].apply(_convert_time, units=units,
-                                                                                        axis=1)
-            self.stress_summary['end time'] = self.stress_summary['end time'].apply(_convert_time, units=units, axis=1)
-            self.stress_summary['duration'] = self.stress_summary['duration'].apply(_convert_time, units=units, axis=1)
+            self.test_summary['start time'] = self.test_summary['start time'].apply(_convert_time, units=units,
+                                                                                    axis=1)
+            self.test_summary['end time'] = self.test_summary['end time'].apply(_convert_time, units=units, axis=1)
+            self.test_summary['duration'] = self.test_summary['duration'].apply(_convert_time, units=units, axis=1)
         # Allow for empty report initializations, though is not an expected use case
         else:
             self.test_name, self.test_description = name, description
-            self.measurements, self.stress_summary = None, None
+            self.measurements, self.test_summary = None, None
             self.num_chps, self.num_lots, self.dev_counts = None, None, None
 
     @staticmethod
-    def format_measurements(measured_vals: list | pd.Series | np.ndarray, prm_name: str, meas_time: timedelta,
-                            prm_type: str = 'parameter') -> pd.DataFrame:
+    def format_measurements(measured_vals: list | pd.Series | np.ndarray, prm_name: str,
+                            meas_time: timedelta, meas_step: int, prm_type: str = 'parameter') -> pd.DataFrame:
         """
         Take a set of measured values of a parameter and condition and create a formatted dataframe to report the
         measured values in.
@@ -102,6 +104,8 @@ class TestSimReport:
             The name of the parameter that the measured_vals measurements correspond to
         meas_time: timedelta
             The relative time at which the measurements were taken within the test duration
+        meas_step: int
+            The unique number of the test step that this measurement data is associated with
         prm_type: str, optional
             Whether the measurements are for a device 'parameter' or a stress 'condition' (default 'parameter')
 
@@ -122,6 +126,7 @@ class TestSimReport:
             num_lots, num_devs, num_meas = measured_vals.shape
             measured_vals = measured_vals.reshape(num_meas * num_devs * num_lots)
         formatted = pd.DataFrame({'param': prm_name,
+                                  'step #': meas_step,
                                   'device #': circ_num,
                                   'chip #': dev_num,
                                   'lot #': lot_num,
@@ -140,16 +145,16 @@ class TestSimReport:
         """
         self.measurements = pd.concat([self.measurements, measured], ignore_index=True)
 
-    def add_stress_report(self, strs_conds: pd.DataFrame):
+    def add_summary_report(self, summary_info: pd.DataFrame):
         """
-        Add stress reporting rows to the dataframe of all reported stress phases
+        Add summary reporting rows to the dataframe of all existing test step summaries
 
         Parameters
         ----------
-        strs_conds: pandas.DataFrame
-            The formatted report of stress conditions to add to the full stress summary
+        summary_info: pandas.DataFrame
+            The formatted report of test step information to add to the full test summary
         """
-        self.stress_summary = pd.concat([self.stress_summary, strs_conds], ignore_index=True)
+        self.test_summary = pd.concat([self.test_summary, summary_info], ignore_index=True)
 
     def export_to_json(self, file: str = None, time_units: str = 'seconds') -> None | dict:
         """
@@ -182,11 +187,11 @@ class TestSimReport:
         meas_cpy = self.measurements.copy()
         meas_cpy['time'] = meas_cpy['time'].apply(_convert_time, units=div_time, axis=1)
         report_json['Measurements'] = meas_cpy.to_json()
-        strs_cpy = self.stress_summary.copy()
+        strs_cpy = self.test_summary.copy()
         strs_cpy['duration'] = strs_cpy['duration'].apply(_convert_time, units=div_time, axis=1)
         strs_cpy['start time'] = strs_cpy['start time'].apply(_convert_time, units=div_time, axis=1)
         strs_cpy['end time'] = strs_cpy['end time'].apply(_convert_time, units=div_time, axis=1)
-        report_json['Stress Summary'] = strs_cpy.to_json()
+        report_json['Test Summary'] = strs_cpy.to_json()
 
         if file:
             # Make the directory if it doesn't yet exist, otherwise the file open will fail

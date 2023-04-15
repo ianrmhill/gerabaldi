@@ -3,6 +3,8 @@
 
 """Classes for defining wear-out tests in terms of conditions, durations, execution steps, and collected data"""
 
+from __future__ import annotations
+
 from datetime import timedelta
 
 from gerabaldi.exceptions import UserConfigError
