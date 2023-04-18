@@ -26,7 +26,7 @@ def _on_demand_import(module: str, pypi_name: str = None):
         if not pypi_name:
             pypi_name = module
         hint = f"Trying to use a feature that requires the optional {module} module. " \
-               f"Please install package '{pypi_name}' first. {repr(e)}"
+               f"Please install package '{pypi_name}' first."
 
         class FailedImport:
             """By returning a class that raises an error when used, we can try to import modules at the top of each file
