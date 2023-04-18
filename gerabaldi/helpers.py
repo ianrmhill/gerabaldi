@@ -21,7 +21,7 @@ def _on_demand_import(module: str, pypi_name: str = None):
     try:
         mod = importlib.import_module(module)
         return mod
-    except ImportError as e:
+    except ImportError:
         # Module name and pypi package name do not always match, we want to tell the user the package to install
         if not pypi_name:
             pypi_name = module
