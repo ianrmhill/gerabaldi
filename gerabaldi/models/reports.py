@@ -15,12 +15,12 @@ from gerabaldi.models.test_specs import TestSpec
 from gerabaldi.exceptions import ArgOverwriteWarning
 from gerabaldi.helpers import _convert_time
 
-__all__ = ['TestSimReport']
+__all__ = ['SimReport']
 
 SECONDS_PER_HOUR = 3600
 
 
-class TestSimReport:
+class SimReport:
     """
     Class for structuring the results of simulated tests for reporting, such as test info, measurements, and so forth
 

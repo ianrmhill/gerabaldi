@@ -104,6 +104,8 @@ class TestSpec:
     description: str
         Optional information about the test purpose, motivation, and execution details
     """
+    __test__ = False
+
     def __init__(self, sequential_steps: list = None, num_chps: int = 1, num_lots: int = 1,
                  name: str = 'unspecified', description: str = 'none provided'):
         """
@@ -158,8 +160,8 @@ class TestSpec:
                 raise UserConfigError('Cannot loop append test steps with a target stress duration of 0.')
             # Ensure steps to add are not purely measurement steps, as that would result in infinite steps being added
             if type(steps) is MeasSpec or (type(steps) is list and all(isinstance(step, MeasSpec) for step in steps)):
-                raise UserConfigError(f"Cannot add steps to test in a loop if no stress phase present, infinite"
-                                      f"test steps will result.")
+                raise UserConfigError('Cannot add steps to test in a loop if no stress phase present, infinite'
+                                      'test steps will result.')
 
             # Loop, appending the set of steps until the stress duration sums to greater than the total requested
             while t < duration:
@@ -178,8 +180,8 @@ class TestSpec:
 
             # Check if the duration was an integer multiple of the duration of the set of steps, warn if not
             if not (t / duration).is_integer():
-                raise UserWarning(f"Appended steps did not result in an integer multiple of the duration, test "
-                                  f"may be longer than intended.")
+                raise UserWarning('Appended steps did not result in an integer multiple of the duration, test '
+                                  'may be longer than intended.')
 
     def calc_samples_needed(self):
         """

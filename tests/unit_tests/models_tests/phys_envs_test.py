@@ -115,7 +115,7 @@ def test_physical_test_environment(sequential_var):
         'bti': DegPrmMdl(DegMechMdl(bti_func, mdl_name='deg'), cond_shift_mdl=CondShiftMdl(cond_func)),
         'hci': DegPrmMdl(DegMechMdl(hci_func, mdl_name='deg2'))})
     test_spec = TestSpec([MeasSpec({'bti': 2, 'hci': 3, 'b': 2}, {'a': 13, 'b': 7})], num_chps=2, num_lots=1)
-    report = TestSimReport(test_spec)
+    report = SimReport(test_spec)
     env_conds = env.gen_env_cond_vals({'a': 4, 'b': 10}, ['bti', 'hci'], report, dev_mdl)
     assert np.allclose(env_conds['bti']['a'], np.array([[[5.6, 5.7], [6.8, 6.9]]]))
     assert np.allclose(env_conds['hci']['a'], np.array([[[5.6, 5.7, 5.8], [6.9, 7.0, 7.1]]]))

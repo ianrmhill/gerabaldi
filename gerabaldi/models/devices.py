@@ -11,7 +11,7 @@ from scipy.optimize import minimize_scalar
 from typing import Callable
 
 from gerabaldi.models.random_vars import RandomVar, Deterministic
-from gerabaldi.models.states import TestSimState
+from gerabaldi.models.states import SimState
 from gerabaldi.exceptions import InvalidTypeError, UserConfigError
 from gerabaldi.helpers import _on_demand_import, _loop_compute
 
@@ -1176,7 +1176,7 @@ class DeviceMdl:
 
         Returns
         -------
-        TestSimState
+        SimState
             The initial state of all parameter instances across devices, chips, and lots
         """
         latents, init_mech_vals, init_prm_vals = {}, {}, {}
@@ -1194,4 +1194,4 @@ class DeviceMdl:
             if type(self.prm_mdl(prm)) == DegPrmMdl:
                 init_prm_vals[prm] = self.prm_mdl(prm).init_mdl.gen_init_vals(sample_counts[prm], num_chps, num_lots)
         # Return a simulation state containing all the generated initial information about the devices to be tested
-        return TestSimState(init_prm_vals, init_mech_vals, latents)
+        return SimState(init_prm_vals, init_mech_vals, latents)

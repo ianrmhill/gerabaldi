@@ -12,7 +12,7 @@ import pandas as pd
 from pandas import Series
 
 from gerabaldi.models.devices import DeviceMdl
-from gerabaldi.models.reports import TestSimReport
+from gerabaldi.models.reports import SimReport
 from gerabaldi.models.random_vars import Deterministic, RandomVar
 from gerabaldi.exceptions import InvalidTypeError, UserConfigError
 from gerabaldi.helpers import _on_demand_import
@@ -356,7 +356,7 @@ class PhysTestEnv:
         """
         return getattr(self, prm + '_var', EnvVrtnMdl())
 
-    def gen_env_cond_vals(self, base_vals: dict, prms: list | dict, test_info: TestSimReport = None,
+    def gen_env_cond_vals(self, base_vals: dict, prms: list | dict, test_info: SimReport = None,
                           dev_mdl: DeviceMdl = None, target: str = 'stress',
                           num_chps: int = 1, num_lots: int = 1) -> dict:
         """
@@ -368,7 +368,7 @@ class PhysTestEnv:
             Mapping of environmental conditions/parameters to their target base values before stochastic influences
         prms: list or dict
             The list of parameters to generate values for, if a dict values are the number of samples to generate
-        test_info: TestSimReport, optional
+        test_info: SimReport, optional
             Report that can be used to determine the number of samples for each param and number of chips and lots
         dev_mdl: DeviceMdl, optional
             The full device model, used to determine which conditions are required to be generated to save work

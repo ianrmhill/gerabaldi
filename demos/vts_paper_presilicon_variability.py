@@ -234,7 +234,7 @@ def visualize(rprts):
 @click.option('--save-data', is_flag=True, default=False, help='If provided, simulated data will be saved to a JSON.')
 def entry(data_dir, save_data):
     if data_dir is not None:
-        rprts = {TestSimReport(file=f"{data_dir}/{DATA_FILES[test]}.json") for test in DATA_FILES}
+        rprts = {SimReport(file=f"{data_dir}/{DATA_FILES[test]}.json") for test in DATA_FILES}
     else:
         data_files = {test: os.path.join(os.path.dirname(__file__), f"data/{DATA_FILES[test]}.json")
                       for test in DATA_FILES} if save_data else None

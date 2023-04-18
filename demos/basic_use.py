@@ -90,7 +90,7 @@ def visualize(report):
 @click.option('--save-data', is_flag=True, default=False, help='If provided, simulated data will be saved to a JSON.')
 def entry(data_file, save_data):
     if data_file is not None:
-        report = TestSimReport(file=data_file)
+        report = SimReport(file=data_file)
     else:
         data_file = os.path.join(os.path.dirname(__file__), f"data/{DATA_FILE_NAME}.json") if save_data else None
         report = run_simulation(save_file=data_file)
