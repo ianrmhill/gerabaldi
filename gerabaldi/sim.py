@@ -18,8 +18,8 @@ SECONDS_PER_HOUR = 3600
 
 
 def gen_init_state(dev_mdl: DeviceMdl, dev_counts: dict = None, num_chps: int = 1, num_lots: int = 1,
-                   quantity_info: TestSimReport = None,
-                   elapsed_time: timedelta | int | float = timedelta()) -> TestSimState:
+                   quantity_info: SimReport = None,
+                   elapsed_time: timedelta | int | float = timedelta()) -> SimState:
     """
     Prepare a test state object for a specified device model prior to execution/simulation of a wear-out test
 
@@ -33,14 +33,14 @@ def gen_init_state(dev_mdl: DeviceMdl, dev_counts: dict = None, num_chps: int = 
         The number of chips per lot to generate state for
     num_lots: int, optional
         The number of production lots to generate state for
-    quantity_info: TestSimReport, optional
+    quantity_info: SimReport, optional
         Simulation report that can be used to automatically determine the number of devices, chips, and lots involved
     elapsed_time: timedelta or int or float, optional
         Initial state should be at time 0, override exists to allow for manual setup of intermediate state
 
     Returns
     -------
-    TestSimState
+    SimState
         The constructed initial state for the test containing initial parameter and sampled latent variable values
     """
     # First determine the source that will determine how many instances/devices for each parameter to initialize
@@ -78,8 +78,8 @@ def gen_init_state(dev_mdl: DeviceMdl, dev_counts: dict = None, num_chps: int = 
     return init_state
 
 
-def _sim_stress_step(step: StrsSpec, sim_state: TestSimState, dev_mdl: DeviceMdl,
-                     test_env: PhysTestEnv, report: TestSimReport, step_id: int):
+def _sim_stress_step(step: StrsSpec, sim_state: SimState, dev_mdl: DeviceMdl,
+                     test_env: PhysTestEnv, report: SimReport, step_id: int):
     # 1. Build the stochastically-adjusted set of stress conditions
     # Only need to generate stress conditions for device parameters that degrade, get the list of those parameters
     deg_prm_list = [prm for prm in dev_mdl.prm_mdl_list if type(dev_mdl.prm_mdl(prm)) == DegPrmMdl]
@@ -115,8 +115,8 @@ def _sim_stress_step(step: StrsSpec, sim_state: TestSimState, dev_mdl: DeviceMdl
     report.add_summary_report(stress_report)
 
 
-def _sim_meas_step(step: MeasSpec, sim_state: TestSimState, dev_mdl: DeviceMdl,
-                   test_env: PhysTestEnv, report: TestSimReport, step_id: int):
+def _sim_meas_step(step: MeasSpec, sim_state: SimState, dev_mdl: DeviceMdl,
+                   test_env: PhysTestEnv, report: SimReport, step_id: int):
     """
     Given a test measurement specification, generate the set of observed values. The baseline/true parameter values
     are provided within the step and deg_data arguments, the measurement process adjusts these values according to test
@@ -134,17 +134,17 @@ def _sim_meas_step(step: MeasSpec, sim_state: TestSimState, dev_mdl: DeviceMdl,
             measured = dev_mdl.prm_mdl(prm).calc_cond_shifted_vals(
                 (report.num_lots, report.num_chps, step.measurements[prm]),
                 conds[prm], sim_state.curr_prm_vals[prm], sim_state.latent_var_vals[prm])
-            measured = TestSimReport.format_measurements(measured, prm, sim_state.elapsed, step_id, 'parameter')
+            measured = SimReport.format_measurements(measured, prm, sim_state.elapsed, step_id, 'parameter')
 
         elif prm in dev_mdl.prm_mdl_list:
             # Derived parameter values that can depend on multiple degraded parameters, i.e. circuit models
             measured = dev_mdl.prm_mdl(prm).calc_circ_vals(
                 step.measurements[prm], conds[prm], sim_state.curr_prm_vals, sim_state.latent_var_vals[prm])
-            measured = TestSimReport.format_measurements(measured, prm, sim_state.elapsed, step_id, 'parameter')
+            measured = SimReport.format_measurements(measured, prm, sim_state.elapsed, step_id, 'parameter')
 
         elif prm in step.conditions:
             # These parameters are not degraded parameters of the device but instead environmental parameters
-            measured = TestSimReport.format_measurements(conds[prm][prm], prm, sim_state.elapsed, step_id, 'condition')
+            measured = SimReport.format_measurements(conds[prm][prm], prm, sim_state.elapsed, step_id, 'condition')
 
         else:
             raise MissingParamError(f"Requested measurement of param '{prm}' failed, param is not defined within the \
@@ -168,7 +168,7 @@ def _sim_meas_step(step: MeasSpec, sim_state: TestSimState, dev_mdl: DeviceMdl,
 
 
 def simulate(test_def: TestSpec, dev_mdl: DeviceMdl, test_env: PhysTestEnv,
-             init_state: TestSimState = None) -> TestSimReport:
+             init_state: SimState = None) -> SimReport:
     """
     Simulate a given wear-out test using a given underlying model
 
@@ -180,7 +180,7 @@ def simulate(test_def: TestSpec, dev_mdl: DeviceMdl, test_env: PhysTestEnv,
         The underlying exact degradation model(s) to use to generate simulated test results
     test_env:
         Definition of the test environment that determines how imprecision is injected into the test results
-    init_state: TestSimState, optional
+    init_state: SimState, optional
         Starting values for device model parameters, optional as normally this will be generated automatically
 
     Returns
@@ -188,7 +188,7 @@ def simulate(test_def: TestSpec, dev_mdl: DeviceMdl, test_env: PhysTestEnv,
     test_report: A TestReport object containing all relevant information on the test structure, execution, and results
     """
     # The test report object assembles all the collected test data into one data structure and tracks configuration info
-    test_report = TestSimReport(test_def)
+    test_report = SimReport(test_def)
 
     # Prepare the simulation data persistence structure
     if not init_state:

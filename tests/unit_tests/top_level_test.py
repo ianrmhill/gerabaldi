@@ -24,7 +24,7 @@ def test_init_state_basic():
                                     prm_name='some param'))
     init_state = gerabaldi.gen_init_state(deg_model, dev_counts={'some param': 10})
     # Check all the defaults
-    assert type(init_state) == TestSimState
+    assert type(init_state) == SimState
     assert init_state.latent_var_vals['some param']['some mech']['rhyme'][0][0][0] == 2
     assert init_state.curr_prm_vals['some param'][0][0][9] == 0
     assert init_state.init_prm_vals['some param'][0][0][8] == 0
@@ -62,13 +62,13 @@ def test_sim_stress_step_basic():
     phys_state = gerabaldi.gen_init_state(deg_model, test_spec.calc_samples_needed(),
                                           test_spec.num_chps, test_spec.num_lots)
     test_env = PhysTestEnv()
-    report = TestSimReport(test_spec)
+    report = SimReport(test_spec)
 
     # Run the function being tested
     _sim_stress_step(stress_step, phys_state, deg_model, test_env, report, 1)
 
     # Check types and returned values
-    assert type(phys_state) == TestSimState
+    assert type(phys_state) == SimState
     assert round(phys_state.elapsed.total_seconds() / SECONDS_PER_HOUR, 2) == 20.00
     assert round(phys_state.curr_prm_vals['current'][0][1][2], 5) == 0.00556
     assert report.test_summary['step name'][0] == 'unspecified'
@@ -103,7 +103,7 @@ def test_sim_meas_step_basic(sequential_var):
                                         'current': MeasInstrument('current', precision=5)})
 
     deg_state = gerabaldi.gen_init_state(sim_model, dev_counts={'current': 10}, elapsed_time=10, num_chps=2)
-    report = TestSimReport(test_spec)
+    report = SimReport(test_spec)
 
     _sim_meas_step(meas_step, deg_state, sim_model, test_env, report, 3)
     assert type(report.measurements) == pd.DataFrame
@@ -136,7 +136,7 @@ def test_wearout_test_sim_basic():
     init_state = gerabaldi.gen_init_state(deg_model, dev_counts={'current': 3}, num_chps=3, num_lots=2)
 
     report = gerabaldi.simulate(test, deg_model, test_env, init_state)
-    assert type(report) == TestSimReport
+    assert type(report) == SimReport
     assert len(report.measurements['param']) == 57
     assert len(report.test_summary['step number']) == 5
     assert round(report.measurements['measured'][40], 5) == 0.00560

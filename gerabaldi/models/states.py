@@ -8,10 +8,10 @@ from __future__ import annotations
 from datetime import timedelta
 from copy import deepcopy
 
-__all__ = ['TestSimState']
+__all__ = ['SimState']
 
 
-class TestSimState:
+class SimState:
     """
     Class to fully track the physical state of a reliability test, such as last executed step, degradation values of
     different parameters, and effective accumulated stress. Intended to be mutated as the test progresses.
