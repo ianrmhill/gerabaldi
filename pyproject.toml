@@ -29,3 +29,7 @@ dependencies = {file = ["requirements.txt"]}
 
 [project.urls]
 "Homepage" = "https://github.com/ianrmhill/gerabaldi"
+
+[tool.ruff]
+line-length = 120
+ignore = ["F403", "F405"]
