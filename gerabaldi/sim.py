@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import pandas as pd
+import logging
 from datetime import timedelta
 from copy import deepcopy
 
@@ -187,6 +188,18 @@ def simulate(test_def: TestSpec, dev_mdl: DeviceMdl, test_env: PhysTestEnv,
     -------
     test_report: A TestReport object containing all relevant information on the test structure, execution, and results
     """
+    
+    # Instantiate a logger upon calling this function
+    logger = logging.getLogger('gerabaldi')
+    logger.setLevel(logging.INFO)
+
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    stream_handler = logging.StreamHandler()
+    stream_handler.setFormatter(formatter)
+    logger.addHandler(stream_handler)
+
+    logger.info("Simulating...")
+
     # The test report object assembles all the collected test data into one data structure and tracks configuration info
     test_report = SimReport(test_def)
 
