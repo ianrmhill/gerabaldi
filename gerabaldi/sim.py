@@ -197,7 +197,7 @@ def simulate(test_def: TestSpec, dev_mdl: DeviceMdl, test_env: PhysTestEnv,
     test_report: A TestReport object containing all relevant information on the test structure, execution, and results
     """
     
-    # Instantiate a logger upon calling this function
+    # Start the logging when calling this function as per Ian's instruction
     logger.info("Simulating...")
     #logger = logging.getLogger('gerabaldi')
     #logger.setLevel(logging.INFO)
