@@ -85,7 +85,7 @@ def visualize(report):
     plt.show()
 
 
-@click.command
+@click.command 
 @click.option('--data-file', default=None, help='Use existing simulated data from a JSON file.')
 @click.option('--save-data', is_flag=True, default=False, help='If provided, simulated data will be saved to a JSON.')
 def entry(data_file, save_data):
