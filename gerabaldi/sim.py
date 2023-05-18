@@ -17,22 +17,6 @@ __all__ = ['simulate', 'gen_init_state']
 
 SECONDS_PER_HOUR = 3600
 
-# Instantiate a module logger
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-
-stream_handler = logging.StreamHandler()
-stream_handler.setFormatter(formatter)
-logger.addHandler(stream_handler)
-
-log_file = "example.log"
-file_handler = logging.FileHandler(log_file)
-file_handler.setFormatter(formatter)
-logger.addHandler(file_handler)
-
-
-
 def gen_init_state(dev_mdl: DeviceMdl, dev_counts: dict = None, num_chps: int = 1, num_lots: int = 1,
                    quantity_info: SimReport = None,
                    elapsed_time: timedelta | int | float = timedelta()) -> SimState:
@@ -203,18 +187,6 @@ def simulate(test_def: TestSpec, dev_mdl: DeviceMdl, test_env: PhysTestEnv,
     -------
     test_report: A TestReport object containing all relevant information on the test structure, execution, and results
     """
-    
-    # Start the logging when calling this function as per Ian's instruction
-    logger.info("Simulating...")
-    #logger = logging.getLogger('gerabaldi')
-    #logger.setLevel(logging.INFO)
-
-    #formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    #stream_handler = logging.StreamHandler()
-    #stream_handler.setFormatter(formatter)
-    #logger.addHandler(stream_handler)
-
-    #logger.info("Simulating...")
 
     # The test report object assembles all the collected test data into one data structure and tracks configuration info
     test_report = SimReport(test_def)
