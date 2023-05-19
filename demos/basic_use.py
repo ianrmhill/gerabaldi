@@ -1,6 +1,7 @@
 # Copyright (c) 2023 Ian Hill
 # SPDX-License-Identifier: Apache-2.0
 
+import logging
 import os
 import sys
 # Welcome to the worst parts of Python! This line adds the parent directory of this file to module search path, from
@@ -11,6 +12,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 import gerabaldi # noqa: ImportNotAtTopOfFile
 from gerabaldi.models import * # noqa: ImportNotAtTopOfFile
 from gerabaldi.helpers import _on_demand_import # noqa: ImportNotAtTopOfFile
+
 
 click = _on_demand_import('click')
 plt = _on_demand_import('matplotlib.pyplot', 'matplotlib')
@@ -53,7 +55,11 @@ def run_simulation(save_file: str = None):
     ########################################################################
     ### 4. Simulate the test                                             ###
     ########################################################################
-    report = gerabaldi.simulate(test_spec, dev_mdl, test_env)
+    my_stream_handler = logging.StreamHandler()
+    my_stream_handler.setLevel(logging.WARNING)
+    my_formatter = logging.Formatter('%(asctime)s_%(name)s_%(levelname)s_%(message)s')
+    my_stream_handler.setFormatter(my_formatter)
+    report = gerabaldi.simulate(test_spec, dev_mdl, test_env, stream_handler = my_stream_handler)
 
     # Save the simulated results to a JSON file for reuse if desired
     if save_file:

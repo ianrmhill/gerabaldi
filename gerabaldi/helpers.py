@@ -11,17 +11,21 @@ from datetime import timedelta
 
 # Instantiate a module logger
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
-stream_handler = logging.StreamHandler()
-stream_handler.setFormatter(formatter)
-logger.addHandler(stream_handler)
+# Pass all log messages to hanlders
+logger.setLevel(logging.DEBUG)
+
+default_stream_handler = logging.StreamHandler()
+default_stream_handler.setLevel(logging.INFO)
+default_stream_handler.setFormatter(formatter)
+logger.addHandler(default_stream_handler)
 
 log_file = "example.log"
-file_handler = logging.FileHandler(log_file)
-file_handler.setFormatter(formatter)
-logger.addHandler(file_handler)
+default_file_handler = logging.FileHandler(log_file)
+default_file_handler.setLevel(logging.INFO)
+default_file_handler.setFormatter(formatter)
+logger.addHandler(default_file_handler)
 
 def _convert_time(time, units, **kwargs): # noqa: UnusedParameter
     """Helper function compatible with pandas apply() function for converting between time representations."""

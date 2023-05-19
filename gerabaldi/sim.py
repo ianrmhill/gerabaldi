@@ -5,13 +5,14 @@
 
 from __future__ import annotations
 
-import pandas as pd
 import logging
+import pandas as pd
 from datetime import timedelta
 from copy import deepcopy
 
 from gerabaldi.models import *
 from gerabaldi.exceptions import MissingParamError, UserConfigError
+from gerabaldi.helpers import logger
 
 __all__ = ['simulate', 'gen_init_state']
 
@@ -168,7 +169,7 @@ def _sim_meas_step(step: MeasSpec, sim_state: SimState, dev_mdl: DeviceMdl,
 
 
 def simulate(test_def: TestSpec, dev_mdl: DeviceMdl, test_env: PhysTestEnv,
-             init_state: SimState = None) -> SimReport:
+             init_state: SimState = None, file_handler = None, stream_handler = None) -> SimReport:
     """
     Simulate a given wear-out test using a given underlying model
 
@@ -182,11 +183,42 @@ def simulate(test_def: TestSpec, dev_mdl: DeviceMdl, test_env: PhysTestEnv,
         Definition of the test environment that determines how imprecision is injected into the test results
     init_state: SimState, optional
         Starting values for device model parameters, optional as normally this will be generated automatically
+    logging_level: optional
+        The user can define the logging level used by the logger or stick to the default 'info' level
+    file_handler: optinonal
+        The user can optionally pass a custom file handler to the logger
+    stream_handler: optinonal
+        The user can optionally pass a custom stream handler to the logger
 
     Returns
     -------
     test_report: A TestReport object containing all relevant information on the test structure, execution, and results
     """
+
+    def configure_logger():
+        """
+        Configure the logger based on the user's preference
+        """
+        # Identify the default handlers based on their types
+        for handler in logger.handlers:
+            print(handler)
+            if isinstance(handler, logging.StreamHandler) and not isinstance(handler, logging.FileHandler):
+                default_stream_handler = handler
+            elif isinstance(handler, logging.FileHandler):
+                default_file_handler = handler
+        
+        # If the user provided a custom stream handler, remove the default one, add the custom one
+        if stream_handler:
+            logger.removeHandler(default_stream_handler)
+            logger.addHandler(stream_handler)
+        
+        # If the user provided a custom file handler, remove the default one, add the custom one
+        if file_handler:
+            logger.removeHandler(default_file_handler)
+            logger.addHandler(file_handler)
+
+    configure_logger()
+    logger.warning("Simulating...")
 
     # The test report object assembles all the collected test data into one data structure and tracks configuration info
     test_report = SimReport(test_def)

@@ -7,3 +7,5 @@ dist/
 
 # Data files
 *.nc
+
+*.log
