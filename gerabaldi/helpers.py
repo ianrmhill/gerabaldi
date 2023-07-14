@@ -9,23 +9,28 @@ import numpy as np
 import pandas as pd
 from datetime import timedelta
 
-# Instantiate a module logger
-logger = logging.getLogger(__name__)
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
-# Pass all log messages to hanlders
-logger.setLevel(logging.DEBUG)
 
-default_stream_handler = logging.StreamHandler()
-default_stream_handler.setLevel(logging.INFO)
-default_stream_handler.setFormatter(formatter)
-logger.addHandler(default_stream_handler)
+def _instantiate_logger ():
+    # Instantiate a module logger
+    logger = logging.getLogger(__name__)
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
-log_file = "example.log"
-default_file_handler = logging.FileHandler(log_file)
-default_file_handler.setLevel(logging.INFO)
-default_file_handler.setFormatter(formatter)
-logger.addHandler(default_file_handler)
+    # Pass all log messages to hanlders, which can have their owen logging level. 
+    logger.setLevel(logging.DEBUG)
+
+    default_stream_handler = logging.StreamHandler()
+    default_stream_handler.setLevel(logging.INFO)
+    default_stream_handler.setFormatter(formatter)
+    logger.addHandler(default_stream_handler)
+
+    log_file = "gerabaldi.log"
+    default_file_handler = logging.FileHandler(log_file)
+    default_file_handler.setLevel(logging.INFO)
+    default_file_handler.setFormatter(formatter)
+    logger.addHandler(default_file_handler)
+
+    return logger
 
 def _convert_time(time, units, **kwargs): # noqa: UnusedParameter
     """Helper function compatible with pandas apply() function for converting between time representations."""
@@ -97,3 +102,5 @@ def _loop_compute(eqn, args_dict: dict, dims: tuple):
                 args = _get_single_index(args_dict, i, j, k)
                 computed[i, j, k] = eqn(**args)
     return computed
+
+logger = _instantiate_logger()

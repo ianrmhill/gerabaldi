@@ -169,7 +169,7 @@ def _sim_meas_step(step: MeasSpec, sim_state: SimState, dev_mdl: DeviceMdl,
 
 
 def simulate(test_def: TestSpec, dev_mdl: DeviceMdl, test_env: PhysTestEnv,
-             init_state: SimState = None, file_handler = None, stream_handler = None) -> SimReport:
+             init_state: SimState = None, logging_level = None, file_handler = None, stream_handler = None) -> SimReport:
     """
     Simulate a given wear-out test using a given underlying model
 
@@ -195,13 +195,16 @@ def simulate(test_def: TestSpec, dev_mdl: DeviceMdl, test_env: PhysTestEnv,
     test_report: A TestReport object containing all relevant information on the test structure, execution, and results
     """
 
-    def configure_logger():
+    def _configure_logger():
         """
         Configure the logger based on the user's preference
         """
-        # Identify the default handlers based on their types
+        # If the user has provided a global logging level, set accordingly
+        if logging_level:
+            logger.setLevel(logging_level)
+        # Identify the default handlers based on their typesS
         for handler in logger.handlers:
-            print(handler)
+            #print(handler)
             if isinstance(handler, logging.StreamHandler) and not isinstance(handler, logging.FileHandler):
                 default_stream_handler = handler
             elif isinstance(handler, logging.FileHandler):
@@ -216,9 +219,10 @@ def simulate(test_def: TestSpec, dev_mdl: DeviceMdl, test_env: PhysTestEnv,
         if file_handler:
             logger.removeHandler(default_file_handler)
             logger.addHandler(file_handler)
+        
 
-    configure_logger()
-    logger.warning("Simulating...")
+    _configure_logger()
+    logger.debug("Simulating...")
 
     # The test report object assembles all the collected test data into one data structure and tracks configuration info
     test_report = SimReport(test_def)
