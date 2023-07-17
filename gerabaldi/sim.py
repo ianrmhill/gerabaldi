@@ -200,9 +200,13 @@ def simulate(test_def: TestSpec, dev_mdl: DeviceMdl, test_env: PhysTestEnv,
         Configure the logger based on the user's preference
         """
         # If the user has provided a global logging level, set accordingly
+        default_stream_handler = None
+        default_file_handler = None
+        
         if logging_level:
             logger.setLevel(logging_level)
-        # Identify the default handlers based on their typesS
+
+        # Identify the default handlers based on their types
         for handler in logger.handlers:
             #print(handler)
             if isinstance(handler, logging.StreamHandler) and not isinstance(handler, logging.FileHandler):
@@ -212,17 +216,20 @@ def simulate(test_def: TestSpec, dev_mdl: DeviceMdl, test_env: PhysTestEnv,
         
         # If the user provided a custom stream handler, remove the default one, add the custom one
         if stream_handler:
-            logger.removeHandler(default_stream_handler)
+            # If there's a default stream handler, remove it first
+            if default_stream_handler:
+                logger.removeHandler(default_stream_handler)
             logger.addHandler(stream_handler)
         
         # If the user provided a custom file handler, remove the default one, add the custom one
         if file_handler:
-            logger.removeHandler(default_file_handler)
+            if default_file_handler:
+                logger.removeHandler(default_file_handler)
             logger.addHandler(file_handler)
         
 
     _configure_logger()
-    logger.debug("Simulating...")
+    logger.info("Simulating...")
 
     # The test report object assembles all the collected test data into one data structure and tracks configuration info
     test_report = SimReport(test_def)

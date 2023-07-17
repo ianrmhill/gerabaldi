@@ -55,12 +55,8 @@ def run_simulation(save_file: str = None):
     ########################################################################
     ### 4. Simulate the test                                             ###
     ########################################################################
-    my_stream_handler = logging.StreamHandler()
-    my_stream_handler.setLevel(logging.WARNING)
-    my_formatter = logging.Formatter('%(asctime)s_%(name)s_%(levelname)s_%(message)s')
-    my_stream_handler.setFormatter(my_formatter)
-    report = gerabaldi.simulate(test_spec, dev_mdl, test_env, stream_handler = my_stream_handler)
-
+    report = gerabaldi.simulate(test_spec, dev_mdl, test_env)
+    
     # Save the simulated results to a JSON file for reuse if desired
     if save_file:
         report.export_to_json(save_file, 'hours')

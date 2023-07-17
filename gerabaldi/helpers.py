@@ -16,7 +16,7 @@ def _instantiate_logger ():
     logger = logging.getLogger(__name__)
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
-    # Pass all log messages to hanlders, which can have their owen logging level. 
+    # Pass all log messages to hanlders, which can have their owen logging levels. 
     logger.setLevel(logging.DEBUG)
 
     default_stream_handler = logging.StreamHandler()
@@ -24,11 +24,11 @@ def _instantiate_logger ():
     default_stream_handler.setFormatter(formatter)
     logger.addHandler(default_stream_handler)
 
-    log_file = "gerabaldi.log"
+    '''log_file = "gerabaldi.log"
     default_file_handler = logging.FileHandler(log_file)
     default_file_handler.setLevel(logging.INFO)
     default_file_handler.setFormatter(formatter)
-    logger.addHandler(default_file_handler)
+    logger.addHandler(default_file_handler)'''
 
     return logger
 
