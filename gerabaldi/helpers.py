@@ -16,7 +16,7 @@ def _instantiate_logger ():
     logger = logging.getLogger(__name__)
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
-    # Pass all log messages to hanlders, which can have their owen logging levels. 
+    # Pass all log messages to hanlders, which can have their own logging levels. 
     logger.setLevel(logging.DEBUG)
 
     # Provide one default stream handler set to level INFO

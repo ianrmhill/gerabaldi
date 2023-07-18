@@ -54,6 +54,7 @@ def run_simulation(save_file: str = None):
     ### 4. Simulate the test                                             ###
     ########################################################################
     report = gerabaldi.simulate(test_spec, dev_mdl, test_env)
+    
     # Save the simulated results to a JSON file for reuse if desired
     if save_file:
         report.export_to_json(save_file, 'hours')
