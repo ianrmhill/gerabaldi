@@ -184,7 +184,7 @@ def simulate(test_def: TestSpec, dev_mdl: DeviceMdl, test_env: PhysTestEnv,
     init_state: SimState, optional
         Starting values for device model parameters, optional as normally this will be generated automatically
     logging_level: optional
-        The user can define the logging level used by the logger or stick to the default 'info' level
+        The user can define the logging level used by the logger itself, not the level of the handlers
     file_handler: optinonal
         The user can optionally pass a custom file handler to the logger
     stream_handler: optinonal
@@ -196,19 +196,17 @@ def simulate(test_def: TestSpec, dev_mdl: DeviceMdl, test_env: PhysTestEnv,
     """
 
     def _configure_logger():
-        """
-        Configure the logger based on the user's preference
-        """
-        # If the user has provided a global logging level, set accordingly
+        """Configure the logger based on the user's preference."""
         default_stream_handler = None
         default_file_handler = None
-        
+
+        # If the user has provided a global logging level, set accordingly
         if logging_level:
             logger.setLevel(logging_level)
 
         # Identify the default handlers based on their types
+        # NOTE: The assumption here is that the logger has one stream and one file handler maximum
         for handler in logger.handlers:
-            #print(handler)
             if isinstance(handler, logging.StreamHandler) and not isinstance(handler, logging.FileHandler):
                 default_stream_handler = handler
             elif isinstance(handler, logging.FileHandler):

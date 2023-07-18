@@ -12,23 +12,18 @@ from datetime import timedelta
 
 
 def _instantiate_logger ():
-    # Instantiate a module logger
+    """Instantiate a module logger."""
     logger = logging.getLogger(__name__)
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
     # Pass all log messages to hanlders, which can have their owen logging levels. 
     logger.setLevel(logging.DEBUG)
 
+    # Provide one default stream handler set to level INFO
     default_stream_handler = logging.StreamHandler()
     default_stream_handler.setLevel(logging.INFO)
     default_stream_handler.setFormatter(formatter)
     logger.addHandler(default_stream_handler)
-
-    '''log_file = "gerabaldi.log"
-    default_file_handler = logging.FileHandler(log_file)
-    default_file_handler.setLevel(logging.INFO)
-    default_file_handler.setFormatter(formatter)
-    logger.addHandler(default_file_handler)'''
 
     return logger
 
