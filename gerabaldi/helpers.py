@@ -9,14 +9,12 @@ import numpy as np
 import pandas as pd
 from datetime import timedelta
 
-
-
-def _instantiate_logger ():
+def _instantiate_logger():
     """Instantiate a module logger."""
     logger = logging.getLogger(__name__)
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
-    # Pass all log messages to hanlders, which can have their own logging levels. 
+    # Pass all log messages to handlers, which can have their own logging levels. 
     logger.setLevel(logging.DEBUG)
 
     # Provide one default stream handler set to level INFO
@@ -26,6 +24,36 @@ def _instantiate_logger ():
     logger.addHandler(default_stream_handler)
 
     return logger
+
+def configure_logger(logger: logging.Logger, logging_level: int = None, file_handler: logging.FileHandler = None, stream_handler: logging.StreamHandler = None):
+    """Configure the logger based on the user's preference."""
+    default_stream_handler = None
+    default_file_handler = None
+
+    # If the user has provided a global logging level, set accordingly
+    if logging_level:
+        logger.setLevel(logging_level)
+
+    # Identify the default handlers based on their types
+    # NOTE: The assumption here is that the logger has one stream and one file handler maximum
+    for handler in logger.handlers:
+        if isinstance(handler, logging.StreamHandler) and not isinstance(handler, logging.FileHandler):
+            default_stream_handler = handler
+        elif isinstance(handler, logging.FileHandler):
+            default_file_handler = handler
+    
+    # If the user provided a custom stream handler, remove the default one, add the custom one
+    if stream_handler:
+        # If there's a default stream handler, remove it first
+        if default_stream_handler:
+            logger.removeHandler(default_stream_handler)
+        logger.addHandler(stream_handler)
+    
+    # If the user provided a custom file handler, remove the default one, add the custom one
+    if file_handler:
+        if default_file_handler:
+            logger.removeHandler(default_file_handler)
+        logger.addHandler(file_handler)
 
 def _convert_time(time, units, **kwargs): # noqa: UnusedParameter
     """Helper function compatible with pandas apply() function for converting between time representations."""

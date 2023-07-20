@@ -103,3 +103,12 @@ class TestLogger(TestCase):
             log_content = file.read().rstrip()
         os.remove("test.log")
         self.assertEqual(log_content, "Simulating...")
+
+        # Set the file handler level to WARNING, there should be nothing in the log
+        my_file_handler = logging.FileHandler("test.log")
+        my_file_handler.setLevel(logging.WARNING)
+        simulate_test(file_handler=my_file_handler)
+        with open ("test.log", "r") as file:
+            log_content = file.read().rstrip()
+        os.remove("test.log")
+        self.assertEqual(log_content, "")

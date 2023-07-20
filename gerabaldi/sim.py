@@ -5,7 +5,6 @@
 
 from __future__ import annotations
 
-import logging
 import pandas as pd
 from datetime import timedelta
 from copy import deepcopy
@@ -13,6 +12,7 @@ from copy import deepcopy
 from gerabaldi.models import *
 from gerabaldi.exceptions import MissingParamError, UserConfigError
 from gerabaldi.helpers import logger
+from gerabaldi.helpers import configure_logger
 
 __all__ = ['simulate', 'gen_init_state']
 
@@ -185,48 +185,16 @@ def simulate(test_def: TestSpec, dev_mdl: DeviceMdl, test_env: PhysTestEnv,
         Starting values for device model parameters, optional as normally this will be generated automatically
     logging_level: optional
         The user can define the logging level used by the logger itself, not the level of the handlers
-    file_handler: optinonal
+    file_handler: optional
         The user can optionally pass a custom file handler to the logger
-    stream_handler: optinonal
+    stream_handler: optional
         The user can optionally pass a custom stream handler to the logger
 
     Returns
     -------
     test_report: A TestReport object containing all relevant information on the test structure, execution, and results
     """
-
-    def _configure_logger():
-        """Configure the logger based on the user's preference."""
-        default_stream_handler = None
-        default_file_handler = None
-
-        # If the user has provided a global logging level, set accordingly
-        if logging_level:
-            logger.setLevel(logging_level)
-
-        # Identify the default handlers based on their types
-        # NOTE: The assumption here is that the logger has one stream and one file handler maximum
-        for handler in logger.handlers:
-            if isinstance(handler, logging.StreamHandler) and not isinstance(handler, logging.FileHandler):
-                default_stream_handler = handler
-            elif isinstance(handler, logging.FileHandler):
-                default_file_handler = handler
-        
-        # If the user provided a custom stream handler, remove the default one, add the custom one
-        if stream_handler:
-            # If there's a default stream handler, remove it first
-            if default_stream_handler:
-                logger.removeHandler(default_stream_handler)
-            logger.addHandler(stream_handler)
-        
-        # If the user provided a custom file handler, remove the default one, add the custom one
-        if file_handler:
-            if default_file_handler:
-                logger.removeHandler(default_file_handler)
-            logger.addHandler(file_handler)
-        
-
-    _configure_logger()
+    configure_logger(logger, logging_level, file_handler, stream_handler)
     logger.info("Simulating...")
 
     # The test report object assembles all the collected test data into one data structure and tracks configuration info
