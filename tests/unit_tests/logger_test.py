@@ -3,12 +3,12 @@ import os
 import logging
 from io import StringIO
 from unittest import TestCase
-
 # Add the directory containing the gerabaldi module to the Python module search path
 gerabaldi_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 sys.path.insert(0, gerabaldi_path)
 from gerabaldi.helpers import logger
 from tests.unit_tests.logger_unit import simulate_test
+
 
 class TestLogger(TestCase):
     def test_logger_name(self):
@@ -43,13 +43,13 @@ class TestLogger(TestCase):
         with self.assertLogs() as captured_logs:
             logger.critical("Critical")
         self.assertEqual(captured_logs.records[0].levelname, "CRITICAL")
-    
+
     def test_log_message(self):
         """Test that the correct log message has been delivered."""
         with self.assertLogs() as captured_logs:
             logger.warning("Test test test")
         self.assertEqual(captured_logs.records[0].getMessage(), "Test test test")
-    
+
     def test_logger_format(self):
         """Test that the handlers have the correct format"""
         for handler in logger.handlers:
@@ -90,7 +90,7 @@ class TestLogger(TestCase):
         # Now set the global logger level to INFO, the message should be "Simulating..."
         log_stream, my_stream_handler = get_stream_handler()
         my_stream_handler.setLevel(logging.INFO)
-        simulate_test(logging_level=logging.INFO,stream_handler=my_stream_handler)
+        simulate_test(logging_level=logging.INFO, stream_handler=my_stream_handler)
         my_stream_handler.flush()
         log_output = log_stream.getvalue()
         self.assertEqual(log_output.rstrip(), "Simulating...")
@@ -99,7 +99,7 @@ class TestLogger(TestCase):
         my_file_handler = logging.FileHandler("test.log")
         my_file_handler.setLevel(logging.INFO)
         simulate_test(file_handler=my_file_handler)
-        with open ("test.log", "r") as file:
+        with open("test.log", "r") as file:
             log_content = file.read().rstrip()
         os.remove("test.log")
         self.assertEqual(log_content, "Simulating...")
@@ -108,7 +108,7 @@ class TestLogger(TestCase):
         my_file_handler = logging.FileHandler("test.log")
         my_file_handler.setLevel(logging.WARNING)
         simulate_test(file_handler=my_file_handler)
-        with open ("test.log", "r") as file:
+        with open("test.log", "r") as file:
             log_content = file.read().rstrip()
         os.remove("test.log")
         self.assertEqual(log_content, "")

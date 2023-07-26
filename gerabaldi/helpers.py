@@ -9,11 +9,11 @@ import numpy as np
 import pandas as pd
 from datetime import timedelta
 
+
 def _instantiate_logger():
     """Instantiate a module logger."""
     logger = logging.getLogger(__name__)
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-
     # Pass all log messages to handlers, which can have their own logging levels. 
     logger.setLevel(logging.DEBUG)
 
@@ -24,6 +24,7 @@ def _instantiate_logger():
     logger.addHandler(default_stream_handler)
 
     return logger
+
 
 def configure_logger(logger: logging.Logger, logging_level: int = None, file_handler: logging.FileHandler = None, stream_handler: logging.StreamHandler = None):
     """Configure the logger based on the user's preference."""
@@ -41,19 +42,20 @@ def configure_logger(logger: logging.Logger, logging_level: int = None, file_han
             default_stream_handler = handler
         elif isinstance(handler, logging.FileHandler):
             default_file_handler = handler
-    
+
     # If the user provided a custom stream handler, remove the default one, add the custom one
     if stream_handler:
         # If there's a default stream handler, remove it first
         if default_stream_handler:
             logger.removeHandler(default_stream_handler)
         logger.addHandler(stream_handler)
-    
+
     # If the user provided a custom file handler, remove the default one, add the custom one
     if file_handler:
         if default_file_handler:
             logger.removeHandler(default_file_handler)
         logger.addHandler(file_handler)
+
 
 def _convert_time(time, units, **kwargs): # noqa: UnusedParameter
     """Helper function compatible with pandas apply() function for converting between time representations."""
@@ -125,5 +127,6 @@ def _loop_compute(eqn, args_dict: dict, dims: tuple):
                 args = _get_single_index(args_dict, i, j, k)
                 computed[i, j, k] = eqn(**args)
     return computed
+
 
 logger = _instantiate_logger()
