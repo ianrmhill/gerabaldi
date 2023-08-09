@@ -183,12 +183,6 @@ def simulate(test_def: TestSpec, dev_mdl: DeviceMdl, test_env: PhysTestEnv,
         Definition of the test environment that determines how imprecision is injected into the test results
     init_state: SimState, optional
         Starting values for device model parameters, optional as normally this will be generated automatically
-    logging_level: optional
-        The user can define the logging level used by the logger itself, not the level of the handlers
-    file_handler: optional
-        The user can optionally pass a custom file handler to the logger
-    stream_handler: optional
-        The user can optionally pass a custom stream handler to the logger
 
     Returns
     -------

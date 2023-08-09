@@ -25,7 +25,29 @@ logger.addHandler(default_stream_handler)
 
 def configure_logger(logging_level: int = None,
                      file_handler: logging.FileHandler = None, stream_handler: logging.StreamHandler = None):
-    """Configure the logger based on the user's preference."""
+    """
+    Configure the logger based on the user's preference.
+
+    Parameters:
+        logging_level (int, optional): The global logging level to set for the logger. If provided, the logger's
+            level will be set to this value. Default is None.
+        file_handler (logging.FileHandler, optional): A custom file handler to be added to the logger. If provided,
+            the default file handler (if exists) will be removed and the custom one will be added. Default is None.
+        stream_handler (logging.StreamHandler, optional): A custom stream handler to be added to the logger. If
+            provided, the default stream handler (if exists) will be removed and the custom one will be added.
+            Default is None.
+
+    Returns:
+        None
+
+    Notes:
+        - The assumption here is that the logger has one stream and one file handler maximum.
+
+    Example:
+        # Configure the logger with a custom stream handler and set the logging level to INFO
+        custom_stream_handler = logging.StreamHandler()
+        configure_logger(logging_level=logging.INFO, stream_handler=custom_stream_handler)
+    """
     logger = logging.getLogger("gerabaldi")
     default_stream_handler = None
     default_file_handler = None
@@ -35,7 +57,6 @@ def configure_logger(logging_level: int = None,
         logger.setLevel(logging_level)
 
     # Identify the default handlers based on their types
-    # NOTE: The assumption here is that the logger has one stream and one file handler maximum
     for handler in logger.handlers:
         if isinstance(handler, logging.StreamHandler) and not isinstance(handler, logging.FileHandler):
             default_stream_handler = handler
@@ -44,7 +65,6 @@ def configure_logger(logging_level: int = None,
 
     # If the user provided a custom stream handler, remove the default one, add the custom one
     if stream_handler:
-        # If there's a default stream handler, remove it first
         if default_stream_handler:
             logger.removeHandler(default_stream_handler)
         logger.addHandler(stream_handler)
