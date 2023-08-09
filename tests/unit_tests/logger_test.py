@@ -7,6 +7,7 @@ from unittest import TestCase
 gerabaldi_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 sys.path.insert(0, gerabaldi_path)
 from gerabaldi.helpers import logger
+from gerabaldi.helpers import configure_logger
 from tests.unit_tests.logger_unit import simulate_test
 
 
@@ -15,7 +16,7 @@ class TestLogger(TestCase):
         """Test that the logger has the correct name."""
         with self.assertLogs() as captured_logs:
             logger.info("Testing logger's name.")
-        self.assertEqual(captured_logs.records[0].name, "gerabaldi.helpers")
+        self.assertEqual(captured_logs.records[0].name, "gerabaldi")
 
     def test_logger_level(self):
         """Test that the correct logging level has been used."""
@@ -66,7 +67,8 @@ class TestLogger(TestCase):
         # There should be no logging messages, as the stream handler's level is set to WARNING
         log_stream, my_stream_handler = get_stream_handler()
         my_stream_handler.setLevel(logging.WARNING)
-        simulate_test(stream_handler=my_stream_handler)
+        configure_logger(stream_handler=my_stream_handler)
+        simulate_test()
         my_stream_handler.flush()
         log_output = log_stream.getvalue()
         self.assertEqual(len(log_output), 0)
@@ -74,7 +76,8 @@ class TestLogger(TestCase):
         # Now with the level set to INFO, the message should be "Simulating..."
         log_stream, my_stream_handler = get_stream_handler()
         my_stream_handler.setLevel(logging.INFO)
-        simulate_test(stream_handler=my_stream_handler)
+        configure_logger(stream_handler=my_stream_handler)
+        simulate_test()
         my_stream_handler.flush()
         log_output = log_stream.getvalue()
         self.assertEqual(log_output.rstrip(), "Simulating...")
@@ -82,7 +85,8 @@ class TestLogger(TestCase):
         # Now set the global logger level to WARNING, there should be no messages
         log_stream, my_stream_handler = get_stream_handler()
         my_stream_handler.setLevel(logging.INFO)
-        simulate_test(logging_level=logging.WARNING, stream_handler=my_stream_handler)
+        configure_logger(logging_level=logging.WARNING, stream_handler=my_stream_handler)
+        simulate_test()
         my_stream_handler.flush()
         log_output = log_stream.getvalue()
         self.assertEqual(len(log_output), 0)
@@ -90,7 +94,8 @@ class TestLogger(TestCase):
         # Now set the global logger level to INFO, the message should be "Simulating..."
         log_stream, my_stream_handler = get_stream_handler()
         my_stream_handler.setLevel(logging.INFO)
-        simulate_test(logging_level=logging.INFO, stream_handler=my_stream_handler)
+        configure_logger(logging_level=logging.INFO, stream_handler=my_stream_handler)
+        simulate_test()
         my_stream_handler.flush()
         log_output = log_stream.getvalue()
         self.assertEqual(log_output.rstrip(), "Simulating...")
@@ -98,7 +103,8 @@ class TestLogger(TestCase):
         # Test the file handler
         my_file_handler = logging.FileHandler("test.log")
         my_file_handler.setLevel(logging.INFO)
-        simulate_test(file_handler=my_file_handler)
+        configure_logger(file_handler=my_file_handler)
+        simulate_test()
         with open("test.log", "r") as file:
             log_content = file.read().rstrip()
         os.remove("test.log")
@@ -107,7 +113,8 @@ class TestLogger(TestCase):
         # Set the file handler level to WARNING, there should be nothing in the log
         my_file_handler = logging.FileHandler("test.log")
         my_file_handler.setLevel(logging.WARNING)
-        simulate_test(file_handler=my_file_handler)
+        configure_logger(file_handler=my_file_handler)
+        simulate_test()
         with open("test.log", "r") as file:
             log_content = file.read().rstrip()
         os.remove("test.log")

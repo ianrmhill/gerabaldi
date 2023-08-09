@@ -12,11 +12,11 @@ from copy import deepcopy
 from gerabaldi.models import *
 from gerabaldi.exceptions import MissingParamError, UserConfigError
 from gerabaldi.helpers import logger
-from gerabaldi.helpers import configure_logger
 
 __all__ = ['simulate', 'gen_init_state']
 
 SECONDS_PER_HOUR = 3600
+
 
 def gen_init_state(dev_mdl: DeviceMdl, dev_counts: dict = None, num_chps: int = 1, num_lots: int = 1,
                    quantity_info: SimReport = None,
@@ -169,7 +169,7 @@ def _sim_meas_step(step: MeasSpec, sim_state: SimState, dev_mdl: DeviceMdl,
 
 
 def simulate(test_def: TestSpec, dev_mdl: DeviceMdl, test_env: PhysTestEnv,
-             init_state: SimState = None, logging_level = None, file_handler = None, stream_handler = None) -> SimReport:
+             init_state: SimState = None) -> SimReport:
     """
     Simulate a given wear-out test using a given underlying model
 
@@ -194,7 +194,6 @@ def simulate(test_def: TestSpec, dev_mdl: DeviceMdl, test_env: PhysTestEnv,
     -------
     test_report: A TestReport object containing all relevant information on the test structure, execution, and results
     """
-    configure_logger(logger, logging_level, file_handler, stream_handler)
     logger.info("Simulating...")
 
     # The test report object assembles all the collected test data into one data structure and tracks configuration info

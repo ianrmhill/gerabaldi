@@ -10,24 +10,23 @@ import pandas as pd
 from datetime import timedelta
 
 
-def _instantiate_logger():
-    """Instantiate a module logger."""
-    logger = logging.getLogger(__name__)
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    # Pass all log messages to handlers, which can have their own logging levels. 
-    logger.setLevel(logging.DEBUG)
+# Instantiate the logger with default settings
+logger = logging.getLogger("gerabaldi")
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+# Pass all log messages to handlers, which can have their own logging levels
+logger.setLevel(logging.DEBUG)
 
-    # Provide one default stream handler set to level INFO
-    default_stream_handler = logging.StreamHandler()
-    default_stream_handler.setLevel(logging.INFO)
-    default_stream_handler.setFormatter(formatter)
-    logger.addHandler(default_stream_handler)
-
-    return logger
+# Provide one default stream handler set to level INFO
+default_stream_handler = logging.StreamHandler()
+default_stream_handler.setLevel(logging.INFO)
+default_stream_handler.setFormatter(formatter)
+logger.addHandler(default_stream_handler)
 
 
-def configure_logger(logger: logging.Logger, logging_level: int = None, file_handler: logging.FileHandler = None, stream_handler: logging.StreamHandler = None):
+def configure_logger(logging_level: int = None,
+                     file_handler: logging.FileHandler = None, stream_handler: logging.StreamHandler = None):
     """Configure the logger based on the user's preference."""
+    logger = logging.getLogger("gerabaldi")
     default_stream_handler = None
     default_file_handler = None
 
@@ -127,6 +126,3 @@ def _loop_compute(eqn, args_dict: dict, dims: tuple):
                 args = _get_single_index(args_dict, i, j, k)
                 computed[i, j, k] = eqn(**args)
     return computed
-
-
-logger = _instantiate_logger()
