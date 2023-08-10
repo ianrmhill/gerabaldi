@@ -11,6 +11,7 @@ from copy import deepcopy
 
 from gerabaldi.models import *
 from gerabaldi.exceptions import MissingParamError, UserConfigError
+from gerabaldi.helpers import logger
 
 __all__ = ['simulate', 'gen_init_state']
 
@@ -187,6 +188,8 @@ def simulate(test_def: TestSpec, dev_mdl: DeviceMdl, test_env: PhysTestEnv,
     -------
     test_report: A TestReport object containing all relevant information on the test structure, execution, and results
     """
+    logger.info("Simulating...")
+
     # The test report object assembles all the collected test data into one data structure and tracks configuration info
     test_report = SimReport(test_def)
 

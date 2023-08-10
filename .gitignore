@@ -1,5 +1,7 @@
 .pytest_cache/
 .idea/
+.__pycache__/
+.vscode/
 
 # Packaging
 dist/
@@ -7,3 +9,6 @@ dist/
 
 # Data files
 *.nc
+*.log
+*.pyc
+

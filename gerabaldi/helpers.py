@@ -3,10 +3,77 @@
 
 """Internal helper functions used within Gerabaldi to streamline the package."""
 
+import logging
 import importlib
 import numpy as np
 import pandas as pd
 from datetime import timedelta
+
+
+# Instantiate the logger with default settings
+logger = logging.getLogger("gerabaldi")
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+# Pass all log messages to handlers, which can have their own logging levels
+logger.setLevel(logging.DEBUG)
+
+# Provide one default stream handler set to level INFO
+default_stream_handler = logging.StreamHandler()
+default_stream_handler.setLevel(logging.INFO)
+default_stream_handler.setFormatter(formatter)
+logger.addHandler(default_stream_handler)
+
+
+def configure_logger(logging_level: int = None,
+                     file_handler: logging.FileHandler = None, stream_handler: logging.StreamHandler = None):
+    """
+    Configure the logger based on the user's preference.
+
+    Parameters:
+        logging_level (int, optional): The global logging level to set for the logger. If provided, the logger's
+            level will be set to this value. Default is None.
+        file_handler (logging.FileHandler, optional): A custom file handler to be added to the logger. If provided,
+            the default file handler (if exists) will be removed and the custom one will be added. Default is None.
+        stream_handler (logging.StreamHandler, optional): A custom stream handler to be added to the logger. If
+            provided, the default stream handler (if exists) will be removed and the custom one will be added.
+            Default is None.
+
+    Returns:
+        None
+
+    Notes:
+        - The assumption here is that the logger has one stream and one file handler maximum.
+
+    Example:
+        # Configure the logger with a custom stream handler and set the logging level to INFO
+        custom_stream_handler = logging.StreamHandler()
+        configure_logger(logging_level=logging.INFO, stream_handler=custom_stream_handler)
+    """
+    logger = logging.getLogger("gerabaldi")
+    default_stream_handler = None
+    default_file_handler = None
+
+    # If the user has provided a global logging level, set accordingly
+    if logging_level:
+        logger.setLevel(logging_level)
+
+    # Identify the default handlers based on their types
+    for handler in logger.handlers:
+        if isinstance(handler, logging.StreamHandler) and not isinstance(handler, logging.FileHandler):
+            default_stream_handler = handler
+        elif isinstance(handler, logging.FileHandler):
+            default_file_handler = handler
+
+    # If the user provided a custom stream handler, remove the default one, add the custom one
+    if stream_handler:
+        if default_stream_handler:
+            logger.removeHandler(default_stream_handler)
+        logger.addHandler(stream_handler)
+
+    # If the user provided a custom file handler, remove the default one, add the custom one
+    if file_handler:
+        if default_file_handler:
+            logger.removeHandler(default_file_handler)
+        logger.addHandler(file_handler)
 
 
 def _convert_time(time, units, **kwargs): # noqa: UnusedParameter
