@@ -3,7 +3,7 @@
 
 """Helper classes and functions to improve testing of stochastic methods."""
 
-import pytest
+import pytest # noqa: PackageNotInRequirements
 import numpy as np
 
 from gerabaldi.models.random_vars import RandomVar

@@ -1,10 +1,6 @@
 # Copyright (c) 2023 Ian Hill
 # SPDX-License-Identifier: Apache-2.0
 
-import click
-import matplotlib.pyplot as plt
-import seaborn as sb
-
 import os
 import sys
 # Welcome to the worst parts of Python! This line adds the parent directory of this file to module search path, from
@@ -12,8 +8,13 @@ import sys
 # installing it as a package from pip (which is undesirable because you would have to rebuild the package every time
 # you changed part of the code).
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-import gerabaldi
-from gerabaldi.models import *
+import gerabaldi # noqa: ImportNotAtTopOfFile
+from gerabaldi.models import * # noqa: ImportNotAtTopOfFile
+from gerabaldi.helpers import _on_demand_import # noqa: ImportNotAtTopOfFile
+
+click = _on_demand_import('click')
+plt = _on_demand_import('matplotlib.pyplot', 'matplotlib')
+sb = _on_demand_import('seaborn')
 
 DATA_FILE_NAME = 'basic_report'
 

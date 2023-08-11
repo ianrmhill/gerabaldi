@@ -1,10 +1,13 @@
-"""Test set ensuring correct functionality of the custom random variable classes."""
+# Copyright (c) 2023 Ian Hill
+# SPDX-License-Identifier: Apache-2.0
 
-import pytest
+"""Test set ensuring correct functionality of the custom random variable classes"""
+
+import pytest # noqa: PackageNotInRequirements
 import numpy as np
 
 from gerabaldi.models.random_vars import *
-from gerabaldi.helpers import _on_demand_import
+from gerabaldi.helpers import _on_demand_import # noqa: AccessProtectedMember
 
 pymc = _on_demand_import('pymc')
 
