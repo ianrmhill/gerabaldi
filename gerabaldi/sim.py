@@ -114,6 +114,7 @@ def _sim_stress_step(step: StrsSpec, sim_state: SimState, dev_mdl: DeviceMdl,
     # Use a DataFrame instead of a Series to simplify the process of merging the reports of different stress steps
     stress_report = pd.DataFrame(merged, index=[0])
     report.add_summary_report(stress_report)
+    logger.info(f"Device model underwent {step.name} stress, simulation time is now {sim_state.elapsed}.")
 
 
 def _sim_meas_step(step: MeasSpec, sim_state: SimState, dev_mdl: DeviceMdl,
@@ -155,8 +156,7 @@ def _sim_meas_step(step: MeasSpec, sim_state: SimState, dev_mdl: DeviceMdl,
         measured['measured'] = test_env.meas_instm(prm).measure(measured['measured'])
         meas_results = pd.concat((meas_results, measured), ignore_index=True)
 
-    if step.verbose:
-        print(f"Conducted measurement {step.name} at simulation time {sim_state.elapsed}.")
+    logger.info(f"Conducted {step.name} measurement at simulation time {sim_state.elapsed}.")
     report.add_measurements(meas_results)
 
     # Report the stress conditions used during this step
@@ -188,8 +188,7 @@ def simulate(test_def: TestSpec, dev_mdl: DeviceMdl, test_env: PhysTestEnv,
     -------
     test_report: A TestReport object containing all relevant information on the test structure, execution, and results
     """
-    logger.info("Simulating...")
-
+    logger.info(f"Starting Gerabaldi simulation of {test_def.name} test ...")
     # The test report object assembles all the collected test data into one data structure and tracks configuration info
     test_report = SimReport(test_def)
 
@@ -207,4 +206,6 @@ def simulate(test_def: TestSpec, dev_mdl: DeviceMdl, test_env: PhysTestEnv,
             _sim_stress_step(step, sim_state, dev_mdl, test_env, test_report, i)
         elif type(step) is MeasSpec:
             _sim_meas_step(step, sim_state, dev_mdl, test_env, test_report, i)
+
+    logger.info('Simulation complete!')
     return test_report

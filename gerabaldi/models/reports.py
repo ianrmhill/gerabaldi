@@ -13,7 +13,7 @@ from pathlib import Path
 
 from gerabaldi.models.test_specs import TestSpec
 from gerabaldi.exceptions import ArgOverwriteWarning
-from gerabaldi.helpers import _convert_time
+from gerabaldi.helpers import _convert_time, logger
 
 __all__ = ['SimReport']
 
@@ -199,5 +199,6 @@ class SimReport:
             Path(data_dir).mkdir(exist_ok=True)
             with open(file, 'w') as f:
                 json.dump(report_json, f)
+            logger.info(f"Successfully exported test report {self.test_name} to file.")
         else:
             return report_json

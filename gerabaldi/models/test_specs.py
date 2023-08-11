@@ -24,10 +24,8 @@ class MeasSpec:
         Mapping from environmental stress conditions to target values for the conditions to maintain during measurements
     name: str
         Optional descriptive name for the measurement specification
-    verbose: bool
-        DEPRECATED. Flag to print out notification when measurement is conducted, will be removed from class
     """
-    def __init__(self, sample_counts: dict, conditions: dict, name: str = 'unspecified', print_action: bool = False):
+    def __init__(self, sample_counts: dict, conditions: dict, name: str = 'unspecified'):
         """
         Parameters
         ----------
@@ -37,13 +35,10 @@ class MeasSpec:
             Mapping from environmental stress conditions to target values for the conditions
         name: str, optional
             Optional descriptive name for the measurement specification (default 'unspecified')
-        print_action: bool, optional
-            DEPRECATED. Flag to print out notification when measurement is conducted, will be removed from class
         """
         self.measurements = sample_counts
         self.conditions = conditions
         self.name = name
-        self.verbose = print_action
 
 
 class StrsSpec:
