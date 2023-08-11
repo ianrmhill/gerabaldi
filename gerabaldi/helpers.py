@@ -3,7 +3,8 @@
 
 """Internal helper functions used within Gerabaldi to streamline the package."""
 
-import logging, coloredlogs
+import logging
+import coloredlogs
 import importlib
 import numpy as np
 import pandas as pd
