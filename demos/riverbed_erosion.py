@@ -40,10 +40,10 @@ def run_simulation(save_file: str = None):
     # We will measure/sample 10 individual locations in the river for each measurement
     erosion_meas = MeasSpec({'riverbed_level': SAMPLES_PER_RIVER}, {'tau': 3}, 'Bed Height Sampling')
     # Each stress phase lasts a quarter of a year
-    summer_strs = StrsSpec({'tau': 4}, HOURS_PER_YEAR / 4, 'Summer Season Flow')
-    autumn_strs = StrsSpec({'tau': 2}, HOURS_PER_YEAR / 4, 'Autumn Season Flow')
-    winter_strs = StrsSpec({'tau': 2}, HOURS_PER_YEAR / 4, 'Winter Season Flow')
-    spring_strs = StrsSpec({'tau': 7}, HOURS_PER_YEAR / 4, 'Spring Season Flow')
+    summer_strs = StrsSpec({'tau': 4}, 0.25, 'Summer Season Flow', 'year')
+    autumn_strs = StrsSpec({'tau': 2}, 0.25, 'Autumn Season Flow', 'y')
+    winter_strs = StrsSpec({'tau': 2}, 0.25, 'Winter Season Flow', 'y')
+    spring_strs = StrsSpec({'tau': 7}, 0.25, 'Spring Season Flow', 'y')
     # We will monitor 5 different rivers for 10 years
     ten_year_test = TestSpec([erosion_meas], RIVERS_SAMPLED, 1, name='Riverbed Erosion Process')
     ten_year_test.append_steps([spring_strs, summer_strs, autumn_strs, winter_strs, erosion_meas], HOURS_PER_YEAR * 10)
