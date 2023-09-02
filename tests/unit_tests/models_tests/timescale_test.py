@@ -1,5 +1,7 @@
-from gerabaldi.models.test_specs import StrsSpec, TestSpec
 from datetime import timedelta
+
+from gerabaldi.models.test_specs import StrsSpec, TestSpec
+from gerabaldi.helpers import _time_transformer
 HOURS_PER_YEAR = 8760
 
 
@@ -12,14 +14,7 @@ class Test_TestSpec(TestSpec):
             duration = 1984  # an arbitrary number
         else:
             if type(loop_for_duration) != timedelta:
-                if time_unit in ['hour', 'h']:
-                    duration = timedelta(hours=loop_for_duration)
-                elif time_unit in ['second', 's']:
-                    duration = timedelta(seconds=loop_for_duration)
-                elif time_unit in ['millisecond', 'ms']:
-                    duration = timedelta(milliseconds=loop_for_duration)
-                elif time_unit in ['year', 'y']:
-                    duration = timedelta(hours=loop_for_duration * HOURS_PER_YEAR)
+                duration = _time_transformer(loop_for_duration, time_unit)
             else:
                 duration = loop_for_duration
 

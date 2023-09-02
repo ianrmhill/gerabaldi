@@ -8,9 +8,9 @@ from __future__ import annotations
 from datetime import timedelta
 
 from gerabaldi.exceptions import UserConfigError
+from gerabaldi.helpers import _time_transformer
 
 __all__ = ['MeasSpec', 'StrsSpec', 'TestSpec']
-HOURS_PER_YEAR = 8760
 
 
 class MeasSpec:
@@ -72,14 +72,7 @@ class StrsSpec:
         if time_unit not in ['hour', 'second', 'millisecond', 'year', 'h', 's', 'ms', 'y']:
             raise UserConfigError("Incorrect time unit. the valid options are 'hour' ('h'), 'second' ('s'), 'millisecond' ('ms'), and 'year' ('y').")
         if type(duration) in [int, float]:
-            if time_unit in ['hour', 'h']:
-                duration = timedelta(hours=duration)
-            elif time_unit in ['second', 's']:
-                duration = timedelta(seconds=duration)
-            elif time_unit in ['millisecond', 'ms']:
-                duration = timedelta(milliseconds=duration)
-            elif time_unit in ['year', 'y']:
-                duration = timedelta(hours=duration * HOURS_PER_YEAR)
+            duration = _time_transformer(duration, time_unit)
         # Ensure the duration of the stress phase/cell is not 0
         if duration == timedelta():
             raise UserConfigError(f"Stress Specification '{name}' cannot have a time duration of 0.")
@@ -157,14 +150,7 @@ class TestSpec:
         else:
             # If we are looping the steps until some amount of elapsed time, we first convert the time for comparison
             if type(loop_for_duration) != timedelta:
-                if time_unit in ['hour', 'h']:
-                    duration = timedelta(hours=loop_for_duration)
-                elif time_unit in ['second', 's']:
-                    duration = timedelta(seconds=loop_for_duration)
-                elif time_unit in ['millisecond', 'ms']:
-                    duration = timedelta(milliseconds=loop_for_duration)
-                elif time_unit in ['year', 'y']:
-                    duration = timedelta(hours=loop_for_duration * HOURS_PER_YEAR)
+                duration = _time_transformer(loop_for_duration, time_unit)
             else:
                 duration = loop_for_duration
 

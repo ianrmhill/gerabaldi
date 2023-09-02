@@ -9,6 +9,7 @@ import importlib
 import numpy as np
 import pandas as pd
 from datetime import timedelta
+HOURS_PER_YEAR = 8760
 
 
 ### Instantiate default logger upon import of this file so that it is always configured ###
@@ -155,3 +156,17 @@ def _loop_compute(eqn, args_dict: dict, dims: tuple):
                 args = _get_single_index(args_dict, i, j, k)
                 computed[i, j, k] = eqn(**args)
     return computed
+
+
+def _time_transformer(duration: int | float, time_unit: str):
+    """TODO: doc str"""
+    if time_unit in ['hour', 'h']:
+        transformed_time = timedelta(hours=duration)
+    elif time_unit in ['second', 's']:
+        transformed_time = timedelta(seconds=duration)
+    elif time_unit in ['millisecond', 'ms']:
+        transformed_time = timedelta(milliseconds=duration)
+    elif time_unit in ['year', 'y']:
+        transformed_time = timedelta(hours=duration * HOURS_PER_YEAR)
+
+    return transformed_time
