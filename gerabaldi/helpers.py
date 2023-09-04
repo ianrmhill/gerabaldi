@@ -158,15 +158,15 @@ def _loop_compute(eqn, args_dict: dict, dims: tuple):
     return computed
 
 
-def _time_transformer(duration: int | float, time_unit: str):
+def _time_transformer(duration: int | float, time_units: str):
     """TODO: doc str"""
-    if time_unit in ['hour', 'h']:
+    if time_units in ['hours', 'h']:
         transformed_time = timedelta(hours=duration)
-    elif time_unit in ['second', 's']:
+    elif time_units in ['seconds', 's']:
         transformed_time = timedelta(seconds=duration)
-    elif time_unit in ['millisecond', 'ms']:
+    elif time_units in ['milliseconds', 'ms']:
         transformed_time = timedelta(milliseconds=duration)
-    elif time_unit in ['year', 'y']:
+    elif time_units in ['years', 'y']:
         transformed_time = timedelta(hours=duration * HOURS_PER_YEAR)
 
     return transformed_time

@@ -18,6 +18,8 @@ from gerabaldi.helpers import _convert_time, logger
 __all__ = ['SimReport']
 
 SECONDS_PER_HOUR = 3600
+SECONDS_PER_MILLISECOND = 0.001
+SECONDS_PER_YEAR = 31536000
 
 
 class SimReport:
@@ -173,16 +175,23 @@ class SimReport:
             No return value if saving to file, otherwise the JSON dictionary format for the report
         """
         report_json = {'Test Name': self.test_name, 'Description': self.test_description}
-        if time_units == 'hours':
+        if time_units in ['hours', 'h']:
             div_time = SECONDS_PER_HOUR
             report_json['Time Units'] = 'Hours'
-        else:
-            # Default time unit is in seconds
-            if time_units != 'seconds':
-                raise ArgOverwriteWarning(f"Could not understand requested time units of {time_units},"
-                                          "defaulting to seconds.")
+        elif time_units in ['seconds', 's']:
             div_time = 1
             report_json['Time Units'] = 'Seconds'
+        elif time_units in ['milliseconds', 'ms']:
+            div_time = SECONDS_PER_MILLISECOND
+            report_json['Time Units'] = 'Milliseconds'
+        elif time_units in ['years', 'y']:
+            div_time = SECONDS_PER_YEAR
+            report_json['Time Units'] = 'Years'
+        else:
+            div_time = 1
+            report_json['Time Units'] = 'Seconds'
+            raise ArgOverwriteWarning(f"Could not understand requested time units of {time_units},"
+                                      "defaulting to seconds.")
 
         meas_cpy = self.measurements.copy()
         meas_cpy['time'] = meas_cpy['time'].apply(_convert_time, units=div_time, axis=1)

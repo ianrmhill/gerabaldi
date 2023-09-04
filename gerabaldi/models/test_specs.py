@@ -55,7 +55,11 @@ class StrsSpec:
     name: str
         Optional descriptive name for the stress specification
     """
-    def __init__(self, conditions: dict, duration: timedelta | int | float, name: str = 'unspecified', time_unit: str = 'hour'):
+    def __init__(self,
+                 conditions: dict,
+                 duration: timedelta | int | float,
+                 name: str = 'unspecified',
+                 time_units: str = 'hours'):
         """
         Parameters
         ----------
@@ -69,10 +73,11 @@ class StrsSpec:
         """
         self.conditions = conditions
         # Currently, test lengths use units of hours, but are provided as timedelta objects
-        if time_unit not in ['hour', 'second', 'millisecond', 'year', 'h', 's', 'ms', 'y']:
-            raise UserConfigError("Incorrect time unit. the valid options are 'hour' ('h'), 'second' ('s'), 'millisecond' ('ms'), and 'year' ('y').")
+        if time_units not in ['hours', 'seconds', 'milliseconds', 'years', 'h', 's', 'ms', 'y']:
+            raise UserConfigError("Incorrect time unit. The valid options are "
+                                  "'hours' ('h'), 'seconds' ('s'), 'milliseconds' ('ms'), and 'years' ('y').")
         if type(duration) in [int, float]:
-            duration = _time_transformer(duration, time_unit)
+            duration = _time_transformer(duration, time_units)
         # Ensure the duration of the stress phase/cell is not 0
         if duration == timedelta():
             raise UserConfigError(f"Stress Specification '{name}' cannot have a time duration of 0.")
@@ -129,7 +134,10 @@ class TestSpec:
         self.description = description
         self.name = name
 
-    def append_steps(self, steps: MeasSpec | StrsSpec | list, loop_for_duration: timedelta | int | float = None, time_unit: str = 'hour'):
+    def append_steps(self,
+                     steps: MeasSpec | StrsSpec | list,
+                     loop_for_duration: timedelta | int | float = None,
+                     time_units: str = 'hours'):
         """
         Append one or more test instruction steps to the end of the existing list of test steps
 
@@ -150,7 +158,10 @@ class TestSpec:
         else:
             # If we are looping the steps until some amount of elapsed time, we first convert the time for comparison
             if type(loop_for_duration) != timedelta:
-                duration = _time_transformer(loop_for_duration, time_unit)
+                if time_units not in ['hours', 'seconds', 'milliseconds', 'years', 'h', 's', 'ms', 'y']:
+                    raise UserConfigError("Incorrect time unit. The valid options are "
+                                          "'hours' ('h'), 'seconds' ('s'), 'milliseconds' ('ms'), and 'years' ('y').")
+                duration = _time_transformer(loop_for_duration, time_units)
             else:
                 duration = loop_for_duration
 
