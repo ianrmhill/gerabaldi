@@ -18,15 +18,15 @@ class Test_TestSpec:
     def __init__(self):
         pass
 
-    def append_steps(self, loop_for_duration: timedelta | int | float = None, time_units: str = 'hours'):
+    def append_steps(self, loop_for_duration: timedelta | int | float = None, time_unit: str = 'hours'):
         if loop_for_duration is None:
             duration = 1984  # an arbitrary number
         else:
             if type(loop_for_duration) != timedelta:
-                if time_units not in ['hours', 'seconds', 'milliseconds', 'years', 'h', 's', 'ms', 'y']:
+                if time_unit not in ['hours', 'seconds', 'milliseconds', 'years', 'h', 's', 'ms', 'y']:
                     raise UserConfigError("Incorrect time unit. The valid options are "
                                           "'hours' ('h'), 'seconds' ('s'), 'milliseconds' ('ms'), and 'years' ('y').")
-                duration = _time_transformer(loop_for_duration, time_units)
+                duration = _time_transformer(loop_for_duration, time_unit)
             else:
                 duration = loop_for_duration
 
@@ -37,24 +37,24 @@ class Test_SimReport:
     def __init__(self):
         pass
 
-    def export_to_json(self, time_units: str = 'seconds'):
+    def export_to_json(self, time_unit: str = 'seconds'):
         report_json = {}
-        if time_units in ['hours', 'h']:
+        if time_unit in ['hours', 'h']:
             div_time = SECONDS_PER_HOUR
             report_json['Time Units'] = 'Hours'
-        elif time_units in ['seconds', 's']:
+        elif time_unit in ['seconds', 's']:
             div_time = 1
             report_json['Time Units'] = 'Seconds'
-        elif time_units in ['milliseconds', 'ms']:
+        elif time_unit in ['milliseconds', 'ms']:
             div_time = SECONDS_PER_MILLISECOND
             report_json['Time Units'] = 'Milliseconds'
-        elif time_units in ['years', 'y']:
+        elif time_unit in ['years', 'y']:
             div_time = SECONDS_PER_YEAR
             report_json['Time Units'] = 'Years'
         else:
             div_time = 1
             report_json['Time Units'] = 'Seconds'
-            raise ArgOverwriteWarning(f"Could not understand requested time units of {time_units},"
+            raise ArgOverwriteWarning(f"Could not understand requested time units of {time_unit},"
                                       "defaulting to seconds.")
 
         return report_json['Time Units'], div_time
@@ -62,16 +62,16 @@ class Test_SimReport:
 
 def test_StrsSpec_timescale():
     with pytest.raises(UserConfigError):
-        StrsSpec(conditions={'tau': 4}, duration=99, time_units='test_invalid')
+        StrsSpec(conditions={'tau': 4}, duration=99, time_unit='test_invalid')
     obj_a = StrsSpec(conditions={'tau': 4}, duration=99)
-    obj_b = StrsSpec(conditions={'tau': 4}, duration=99, time_units='hours')
-    obj_c = StrsSpec(conditions={'tau': 4}, duration=99.9, time_units='h')
-    obj_d = StrsSpec(conditions={'tau': 4}, duration=99, time_units='seconds')
-    obj_e = StrsSpec(conditions={'tau': 4}, duration=99, time_units='s')
-    obj_f = StrsSpec(conditions={'tau': 4}, duration=99, time_units='milliseconds')
-    obj_g = StrsSpec(conditions={'tau': 4}, duration=99, time_units='ms')
-    obj_h = StrsSpec(conditions={'tau': 4}, duration=99, time_units='years')
-    obj_i = StrsSpec(conditions={'tau': 4}, duration=99, time_units='y')
+    obj_b = StrsSpec(conditions={'tau': 4}, duration=99, time_unit='hours')
+    obj_c = StrsSpec(conditions={'tau': 4}, duration=99.9, time_unit='h')
+    obj_d = StrsSpec(conditions={'tau': 4}, duration=99, time_unit='seconds')
+    obj_e = StrsSpec(conditions={'tau': 4}, duration=99, time_unit='s')
+    obj_f = StrsSpec(conditions={'tau': 4}, duration=99, time_unit='milliseconds')
+    obj_g = StrsSpec(conditions={'tau': 4}, duration=99, time_unit='ms')
+    obj_h = StrsSpec(conditions={'tau': 4}, duration=99, time_unit='years')
+    obj_i = StrsSpec(conditions={'tau': 4}, duration=99, time_unit='y')
     obj_j = StrsSpec(conditions={'tau': 4}, duration=timedelta(hours=99))
 
     assert obj_a.duration == timedelta(hours=99)
@@ -89,17 +89,17 @@ def test_StrsSpec_timescale():
 def test_TestSpec_timescale():
     test = Test_TestSpec()
     with pytest.raises(UserConfigError):
-        test.append_steps(loop_for_duration=99, time_units='test_invalid')
+        test.append_steps(loop_for_duration=99, time_unit='test_invalid')
     a = test.append_steps()
     b = test.append_steps(loop_for_duration=99)
-    c = test.append_steps(loop_for_duration=99, time_units='hours')
-    d = test.append_steps(loop_for_duration=99.9, time_units='h')
-    e = test.append_steps(loop_for_duration=99, time_units='seconds')
-    f = test.append_steps(loop_for_duration=99, time_units='s')
-    g = test.append_steps(loop_for_duration=99, time_units='milliseconds')
-    h = test.append_steps(loop_for_duration=99, time_units='ms')
-    i = test.append_steps(loop_for_duration=99, time_units='years')
-    j = test.append_steps(loop_for_duration=99, time_units='y')
+    c = test.append_steps(loop_for_duration=99, time_unit='hours')
+    d = test.append_steps(loop_for_duration=99.9, time_unit='h')
+    e = test.append_steps(loop_for_duration=99, time_unit='seconds')
+    f = test.append_steps(loop_for_duration=99, time_unit='s')
+    g = test.append_steps(loop_for_duration=99, time_unit='milliseconds')
+    h = test.append_steps(loop_for_duration=99, time_unit='ms')
+    i = test.append_steps(loop_for_duration=99, time_unit='years')
+    j = test.append_steps(loop_for_duration=99, time_unit='y')
     k = test.append_steps(loop_for_duration=timedelta(hours=99))
 
     assert a == 1984

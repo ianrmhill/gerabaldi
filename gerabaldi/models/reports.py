@@ -158,7 +158,7 @@ class SimReport:
         """
         self.test_summary = pd.concat([self.test_summary, summary_info], ignore_index=True)
 
-    def export_to_json(self, file: str = None, time_units: str = 'seconds') -> None | dict:
+    def export_to_json(self, file: str = None, time_unit: str = 'seconds') -> None | dict:
         """
         Formats a test report as a json string so that it can be saved as a file for storage or sharing
 
@@ -166,7 +166,7 @@ class SimReport:
         ----------
         file: str, optional
             The path and file (absolute or relative to CWD) to save the report to, if not provided the JSON is returned
-        time_units: str, optional
+        time_unit: str, optional
             The format to save test time instants as within the JSON (default 'seconds')
 
         Returns
@@ -175,26 +175,26 @@ class SimReport:
             No return value if saving to file, otherwise the JSON dictionary format for the report
         """
         report_json = {'Test Name': self.test_name, 'Description': self.test_description}
-        if time_units in ['hours', 'h']:
+        if time_unit in ['hours', 'h']:
             div_time = SECONDS_PER_HOUR
             report_json['Time Units'] = 'Hours'
-        elif time_units in ['seconds', 's']:
+        elif time_unit in ['seconds', 's']:
             div_time = 1
             report_json['Time Units'] = 'Seconds'
-        elif time_units in ['milliseconds', 'ms']:
+        elif time_unit in ['milliseconds', 'ms']:
             div_time = SECONDS_PER_MILLISECOND
             report_json['Time Units'] = 'Milliseconds'
-        elif time_units in ['years', 'y']:
+        elif time_unit in ['years', 'y']:
             div_time = SECONDS_PER_YEAR
             report_json['Time Units'] = 'Years'
         else:
             div_time = 1
             report_json['Time Units'] = 'Seconds'
-            raise ArgOverwriteWarning(f"Could not understand requested time units of {time_units},"
+            raise ArgOverwriteWarning(f"Could not understand requested time units of {time_unit},"
                                       "defaulting to seconds.")
 
         meas_cpy = self.measurements.copy()
-        meas_cpy['time'] = meas_cpy['time'].apply(_convert_time, units=div_time, axis=1)
+        meas_cpy['time'] = meas_cpy['time'].apply(_convert_time, units=div_time, axis=1) # apply to axis 1
         report_json['Measurements'] = meas_cpy.to_json()
         strs_cpy = self.test_summary.copy()
         strs_cpy['duration'] = strs_cpy['duration'].apply(_convert_time, units=div_time, axis=1)

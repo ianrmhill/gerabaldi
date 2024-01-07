@@ -92,11 +92,15 @@ def _sim_stress_step(step: StrsSpec, sim_state: SimState, dev_mdl: DeviceMdl,
         equiv_times = dev_mdl.prm_mdl(prm).calc_equiv_strs_times(
             (report.num_lots, report.num_chps, report.dev_counts[prm]),
             sim_state.curr_deg_mech_vals[prm], strs_conds[prm],
-            sim_state.init_deg_mech_vals[prm], sim_state.latent_var_vals[prm])
+            sim_state.init_deg_mech_vals[prm], sim_state.latent_var_vals[prm])  # Equivalent time in hours, TODO: support other time units
         # Now add on the time for the current stress phase
         for mech in equiv_times:
-            equiv_times[mech] += step.duration.total_seconds() / SECONDS_PER_HOUR
-
+            equiv_times[mech] += step.duration.total_seconds() / SECONDS_PER_HOUR  # Convert timedelta to seconds then to hours and add with equivalent time,
+            # TODO: refer to parameter's property for specified time unit, need to be same as equiv time, this is the "converting to raw values" part
+            # This is within one object of DegPrmMdl, so refer to that. However, each DegPrmMdl calls calc_equiv_strs_times or calc_deg_vals
+            # of their DegMechMdl/FailMechMdl's calc_equiv_strs_times or calc_deg_vals. But still on the DegPrmMdl level, it's all hours?
+            # FIXME: Why bother setting units for DegMechMdl/FailMechMdl then? Where are these units used?
+            # In calc_deg_vals() and calc_equiv_strs_time(), you can see self.compute() is called, this is the specified equation. 
         # 3. Simulate the degradation for each device after adding the equivalent prior stress time
         sim_state.curr_prm_vals[prm], sim_state.curr_deg_mech_vals[prm] = dev_mdl.prm_mdl(prm).calc_deg_vals(
             (report.num_lots, report.num_chps, report.dev_counts[prm]),
