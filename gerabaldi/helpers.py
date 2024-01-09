@@ -10,7 +10,10 @@ import numpy as np
 import pandas as pd
 from datetime import timedelta
 HOURS_PER_YEAR = 8760
-
+SECONDS_PER_HOUR = 3600
+SECONDS_PER_DAY = 3600 * 24
+SECONDS_PER_YEAR = 3600 * 24 * 365
+SECONDS_PER_MILLISECOND = 1/1000
 
 ### Instantiate default logger upon import of this file so that it is always configured ###
 # Instantiate the logger with default settings
@@ -158,7 +161,7 @@ def _loop_compute(eqn, args_dict: dict, dims: tuple):
     return computed
 
 
-def _time_transformer(duration: int | float, time_unit: str):
+def _time_transformer(duration: int | float, time_unit: str) -> timedelta:
     """TODO: doc str"""
     if time_unit in ['hours', 'h']:
         transformed_time = timedelta(hours=duration)
@@ -168,5 +171,19 @@ def _time_transformer(duration: int | float, time_unit: str):
         transformed_time = timedelta(milliseconds=duration)
     elif time_unit in ['years', 'y']:
         transformed_time = timedelta(hours=duration * HOURS_PER_YEAR)
+
+    return transformed_time
+
+
+def _inverse_time_transformer(duration: timedelta, time_unit: str) -> float:
+    """Transform timedelta to raw time value."""
+    if time_unit in ['hours', 'h']:
+        transformed_time = duration.total_seconds() / SECONDS_PER_HOUR
+    elif time_unit in ['seconds', 's']:
+        transformed_time = duration.total_seconds()
+    elif time_unit in ['milliseconds', 'ms']:
+        transformed_time = duration.total_seconds() / SECONDS_PER_MILLISECOND
+    elif time_unit in ['years', 'y']:
+        transformed_time = duration.total_seconds() / SECONDS_PER_YEAR
 
     return transformed_time

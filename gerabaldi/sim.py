@@ -11,7 +11,7 @@ from copy import deepcopy
 
 from gerabaldi.models import *
 from gerabaldi.exceptions import MissingParamError, UserConfigError
-from gerabaldi.helpers import logger
+from gerabaldi.helpers import logger, _inverse_time_transformer
 
 __all__ = ['simulate', 'gen_init_state']
 
@@ -87,6 +87,7 @@ def _sim_stress_step(step: StrsSpec, sim_state: SimState, dev_mdl: DeviceMdl,
     strs_conds = test_env.gen_env_cond_vals(step.conditions, deg_prm_list, report, dev_mdl, 'stress')
 
     for prm in deg_prm_list:
+        mech_time_unit_dict = dev_mdl.prm_mdl(prm).mech_time_unit_dict
         # 2. Calculate the equivalent stress times that would have been needed under the generated stress conditions to
         # obtain the prior degradation values. First we calculate the equivalent time to reach the current degradation
         equiv_times = dev_mdl.prm_mdl(prm).calc_equiv_strs_times(
@@ -95,7 +96,9 @@ def _sim_stress_step(step: StrsSpec, sim_state: SimState, dev_mdl: DeviceMdl,
             sim_state.init_deg_mech_vals[prm], sim_state.latent_var_vals[prm])  # Equivalent time in hours, TODO: support other time units
         # Now add on the time for the current stress phase
         for mech in equiv_times:
-            equiv_times[mech] += step.duration.total_seconds() / SECONDS_PER_HOUR  # Convert timedelta to seconds then to hours and add with equivalent time,
+            #print(mech_time_unit_dict[mech])
+            mech_time_unit = mech_time_unit_dict[mech]
+            equiv_times[mech] += _inverse_time_transformer(step.duration, mech_time_unit)  # Convert timedelta to seconds then to hours and add with equivalent time,
             # TODO: refer to parameter's property for specified time unit, need to be same as equiv time, this is the "converting to raw values" part
             # This is within one object of DegPrmMdl, so refer to that. However, each DegPrmMdl calls calc_equiv_strs_times or calc_deg_vals
             # of their DegMechMdl/FailMechMdl's calc_equiv_strs_times or calc_deg_vals. But still on the DegPrmMdl level, it's all hours?

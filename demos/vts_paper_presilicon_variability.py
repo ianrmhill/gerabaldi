@@ -103,13 +103,13 @@ def run_simulation(save_files: dict = None):
     dev_mdl = DeviceMdl({'v_th': DegPrmMdl(
         deg_mech_mdls={
             'bti': DegMechMdl(
-                bti_vth_shift_empirical,  # mech_eqn
+                bti_vth_shift_empirical, time_unit="h",# mech_eqn
                 a_0=LatentVar(Normal(0.006, 0.0005)),  # latent_vars
                 e_aa=LatentVar(Normal(-0.05, 0.0002), chp_vrtn_mdl=Normal(1, 0.0003), lot_vrtn_mdl=Normal(1, 0.0001)),
                 alpha=LatentVar(Normal(9.5, 0.002), chp_vrtn_mdl=Normal(1, 0.005)),
                 n=LatentVar(Normal(0.4, 0.0005))),
             'hci': DegMechMdl(
-                hci_vth_shift_empirical,
+                hci_vth_shift_empirical, time_unit="h",
                 a_0=LatentVar(Normal(0.1, 0.004)),
                 n=LatentVar(Normal(0.62, 0.003)),
                 alpha=LatentVar(Normal(7.2, 0.03), chp_vrtn_mdl=Normal(1, 0.04)),
