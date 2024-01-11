@@ -13,7 +13,7 @@ from typing import Callable
 from gerabaldi.models.random_vars import RandomVar, Deterministic
 from gerabaldi.models.states import SimState
 from gerabaldi.exceptions import InvalidTypeError, UserConfigError
-from gerabaldi.helpers import _on_demand_import, _loop_compute
+from gerabaldi.helpers import _on_demand_import, _loop_compute, _check_time_unit, _handle_prm_time_unit
 
 # Optional imports are loaded using a helper function that suppresses import errors until attempted use
 pymc = _on_demand_import('pymc')
@@ -434,7 +434,7 @@ class DegMechMdl(MechMdl):
     unitary: int or float
         The value for the mechanism output that results in no effect to the parent parameter's output value
     """
-    def __init__(self, mech_eqn: Callable = None, mdl_name: str = None, unitary_val: int = 0, time_unit: str = 'hours', **latent_vars: LatentVar):
+    def __init__(self, mech_eqn: Callable = None, mdl_name: str = None, unitary_val: int = 0, time_unit: str = None, **latent_vars: LatentVar):
         """
         Parameters
         ----------
@@ -449,6 +449,7 @@ class DegMechMdl(MechMdl):
             Latent variable models used as part of the mechanism's compute equation
         """
         super().__init__(mech_eqn, mdl_name, unitary_val, **latent_vars)
+        _check_time_unit(time_unit)
         self.time_unit = time_unit
 
     def calc_equiv_strs_time(self, deg_val: int | float, init_val: int | float,
@@ -510,7 +511,7 @@ class FailMechMdl(MechMdl):
     unitary: int or float
         The value for the mechanism output that results in no effect to the parent parameter's output value
     """
-    def __init__(self, mech_eqn: Callable = None, mdl_name: str = None, unitary_val: int = 0, time_unit: str = 'hours', **latent_vars: LatentVar):
+    def __init__(self, mech_eqn: Callable = None, mdl_name: str = None, unitary_val: int = 0, time_unit: str = None, **latent_vars: LatentVar):
         """
         Parameters
         ----------
@@ -525,6 +526,7 @@ class FailMechMdl(MechMdl):
             Latent variable models used as part of the mechanism's compute equation
         """
         super().__init__(mech_eqn, mdl_name, unitary_val, **latent_vars)
+        _check_time_unit(time_unit)
         self.time_unit = time_unit
 
     def calc_equiv_strs_time(self, deg_val: int | float, init_val: int | float,
@@ -733,7 +735,7 @@ class DegPrmMdl(LatentMdl):
     """
     def __init__(self, deg_mech_mdls: DegMechMdl | FailMechMdl | dict, init_val_mdl: InitValMdl = None,
                  cond_shift_mdl: CondShiftMdl = None, compute_eqn: Callable = None,
-                 prm_name: str = None, array_computable: bool = True, time_unit: str = 'hours', **latent_vars: LatentVar):
+                 prm_name: str = None, array_computable: bool = True, time_unit: str = None, **latent_vars: LatentVar):
         """
         Parameters
         ----------
@@ -753,6 +755,8 @@ class DegPrmMdl(LatentMdl):
         **latent_vars: dict of LatentVar, optional
             Any latent variables used within the degraded parameter's compute equation
         """
+        _check_time_unit(time_unit)
+        self.time_unit = time_unit
         self.init_mdl = init_val_mdl if init_val_mdl else InitValMdl(init_val=LatentVar(deter_val=0))
         self.cond_mdl = cond_shift_mdl if cond_shift_mdl else CondShiftMdl()
         # Create attributes for mechanism models based on the model names
@@ -763,12 +767,16 @@ class DegPrmMdl(LatentMdl):
                 deg_mech_mdls[mech].name = mech
                 setattr(self, f"_{mech}_mdl", deg_mech_mdls[mech])
                 self.mech_mdl_list.append(mech)
+                #if (deg_mech_mdls[mech].time_unit):  # If this mechanism has a specified time unit, store it to the dict. If all mechanisms have none, then the dict will be empty
                 self.mech_time_unit_dict[mech] = deg_mech_mdls[mech].time_unit
+                #else:
+                    #self.mech_time_unit_dict[mech] =
         else:
             if not deg_mech_mdls.name:
                 raise UserConfigError('Please specify a name for the degradation mechanism.')
             setattr(self, f"_{deg_mech_mdls.name}_mdl", deg_mech_mdls)
             self.mech_mdl_list.append(deg_mech_mdls.name)
+            #if (deg_mech_mdls.time_unit):
             self.mech_time_unit_dict[deg_mech_mdls.name] = deg_mech_mdls.time_unit
         # The computed parameter value is assumed to be just a simple sum of the different components, but
         # allow the user to provide a custom equation just in case
@@ -777,7 +785,6 @@ class DegPrmMdl(LatentMdl):
                 return init + cond + sum(mechs.values())
             compute_eqn = basic_sum
         self.array_compute = array_computable
-        self.time_unit = time_unit
         super().__init__(compute_eqn, prm_name, **latent_vars)
 
     def mech_mdl(self, mdl):
@@ -1132,7 +1139,7 @@ class DeviceMdl:
     prm_mdl_list: list of DegPrmMdl or CircPrmMdl
         List of parameters that this device model incorporates, parameter models can be retrieved via the prm_mdl method
     """
-    def __init__(self, prm_mdls: DegPrmMdl | CircPrmMdl | dict, name: str = None, time_unit: str = 'hours'):
+    def __init__(self, prm_mdls: DegPrmMdl | CircPrmMdl | dict, name: str = None, time_unit: str = None):
         """
         Parameters
         ----------
@@ -1143,6 +1150,8 @@ class DeviceMdl:
         TODO: doc str
         """
         self.name = name
+        _check_time_unit(time_unit)
+        self.time_unit = time_unit
         # Create attributes for the degraded parameter models based on the model names
         self.prm_mdl_list = []
         self.prm_time_unit_dict = {}  # A dictionary that stores the time unit for each DegPrmMdl object
@@ -1152,17 +1161,17 @@ class DeviceMdl:
                 setattr(self, f"_{prm}_mdl", prm_mdls[prm])
                 self.prm_mdl_list.append(prm)
                 if (isinstance(prm_mdls[prm], DegPrmMdl)):
-                    #print(prm_mdls[prm].mech_mdl_list)
-                    #print(prm_mdls[prm].mech_time_unit_dict)
-                    self.prm_time_unit_dict[prm] = prm_mdls[prm].time_unit
+                    _handle_prm_time_unit(prm_mdls[prm])
+
         else:
             if not prm_mdls.name:
                 raise UserConfigError('Please specify a name for the device parameter.')
             setattr(self, f"_{prm_mdls.name}_mdl", prm_mdls)
             self.prm_mdl_list.append(prm_mdls.name)
             if (isinstance(prm_mdls, DegPrmMdl)):
-                self.prm_time_unit_dict[prm_mdls.name] = prm_mdls.time_unit
-        #print(self.prm_time_unit_dict)
+                _handle_prm_time_unit(prm_mdls)
+
+    #print(self.prm_time_unit_dict)
 
     def prm_mdl(self, mdl):
         """
