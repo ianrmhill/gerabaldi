@@ -207,15 +207,14 @@ def _handle_prm_time_unit(prm) -> bool:
             for key in prm.mech_time_unit_dict:
                 prm.mech_time_unit_dict[key] = prm.time_unit
         else:
-            check_device_time_unit = True  # Need to check for device time unit
+            check_device_time_unit = True  # Need to check for device time unit for this parameter
     # Some mechanisms in this parameter have a time unit, while some have none, set those who have none to hours
     elif (None in prm.mech_time_unit_dict.values()):
         for key in prm.mech_time_unit_dict:
             if prm.mech_time_unit_dict[key] is None:
                 prm.mech_time_unit_dict[key] = "hours"
-                # TODO: Warn user some mechs under this prm is set to default
                 logger.warning("{}'s time unit is set to hours by default.".format(key))
             if prm.time_unit:
                 logger.warning("{}'s time unit is overlooked because some of its MechMdl objects have time unit specified.".format(prm.name))
-
+                #TODO: check for device's time unit.
     return check_device_time_unit

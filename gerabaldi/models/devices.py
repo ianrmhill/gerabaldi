@@ -13,7 +13,7 @@ from typing import Callable
 from gerabaldi.models.random_vars import RandomVar, Deterministic
 from gerabaldi.models.states import SimState
 from gerabaldi.exceptions import InvalidTypeError, UserConfigError
-from gerabaldi.helpers import _on_demand_import, _loop_compute, _check_time_unit, _handle_prm_time_unit
+from gerabaldi.helpers import logger, _on_demand_import, _loop_compute, _check_time_unit, _handle_prm_time_unit
 
 # Optional imports are loaded using a helper function that suppresses import errors until attempted use
 pymc = _on_demand_import('pymc')
@@ -1156,21 +1156,55 @@ class DeviceMdl:
         self.prm_mdl_list = []
         self.prm_time_unit_dict = {}  # A dictionary that stores the time unit for each DegPrmMdl object
         if type(prm_mdls) == dict:
+            prm_flag_dict = {}  # check_device_time_unit flags of parameters
             for prm in prm_mdls:
                 prm_mdls[prm].name = prm
                 setattr(self, f"_{prm}_mdl", prm_mdls[prm])
                 self.prm_mdl_list.append(prm)
                 if (isinstance(prm_mdls[prm], DegPrmMdl)):
-                    _handle_prm_time_unit(prm_mdls[prm])
-
+                    check_device_time_unit = _handle_prm_time_unit(prm_mdls[prm])
+                    prm_flag_dict[prm] = check_device_time_unit
+            if all(flag is True for flag in prm_flag_dict.values()):
+                # All parameters requested to check the device time unit
+                if self.time_unit:
+                    # Set all mechs of all prms to this devide time unit
+                    for prm in self.prm_mdl_list:
+                        if (isinstance(prm_mdls[prm], DegPrmMdl)):
+                            for mech in prm_mdls[prm].mech_mdl_list:
+                                prm_mdls[prm].mech_time_unit_dict[mech] = self.time_unit
+                else:
+                    # Set all mechs of all prms to default hours
+                    for prm in self.prm_mdl_list:
+                        if (isinstance(prm_mdls[prm], DegPrmMdl)):
+                            for mech in prm_mdls[prm].mech_mdl_list:
+                                prm_mdls[prm].mech_time_unit_dict[mech] = "hours"
+                    logger.warning("No time unit specified. All mechanisms' units are default to hours.")
+            else:
+                # Only some parameters requested for checking the device time unit
+                # Don not check. Instead, set their mechs' units to default hours
+                for prm in prm_flag_dict:
+                    if prm_flag_dict[prm] is True:
+                        for mech in prm_mdls[prm].mech_mdl_list:
+                            prm_mdls[prm].mech_time_unit_dict[mech] = "hours"
+                        logger.warning("{}'s mechanisms' time units are default to hours.".format(prm))
         else:
             if not prm_mdls.name:
                 raise UserConfigError('Please specify a name for the device parameter.')
             setattr(self, f"_{prm_mdls.name}_mdl", prm_mdls)
             self.prm_mdl_list.append(prm_mdls.name)
             if (isinstance(prm_mdls, DegPrmMdl)):
-                _handle_prm_time_unit(prm_mdls)
-
+                check_device_time_unit = _handle_prm_time_unit(prm_mdls)
+                # In this case, the device only has one DegPrmMdl object, if the flag of check_device_time_unit is raised, we check right away
+                if (check_device_time_unit):
+                    if self.time_unit:
+                        # Set all mechs of all prms to this devide time unit
+                        for mech in prm_mdls.mech_mdl_list:
+                            prm_mdls.mech_time_unit_dict[mech] = self.time_unit
+                    else:
+                        # Set all mechs of all prms to default hours
+                        for mech in prm_mdls.mech_mdl_list:
+                            prm_mdls.mech_time_unit_dict[mech] = "hours"
+                        logger.warning("No time unit specified. All mechanisms' units are default to hours.")
     #print(self.prm_time_unit_dict)
 
     def prm_mdl(self, mdl):
