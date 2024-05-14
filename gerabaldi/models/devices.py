@@ -1155,7 +1155,9 @@ class DeviceMdl:
         # Create attributes for the degraded parameter models based on the model names
         self.prm_mdl_list = []
         self.prm_time_unit_dict = {}  # A dictionary that stores the time unit for each DegPrmMdl object
-        if type(prm_mdls) == dict:
+
+        # Check the time unit at the device level
+        if type(prm_mdls) == dict:  # If we have multiple parameters
             prm_flag_dict = {}  # check_device_time_unit flags of parameters
             for prm in prm_mdls:
                 prm_mdls[prm].name = prm
@@ -1180,8 +1182,8 @@ class DeviceMdl:
                                 prm_mdls[prm].mech_time_unit_dict[mech] = "hours"
                     logger.warning("No time unit specified. All mechanisms' units are default to hours.")
             else:
-                # Only some parameters requested for checking the device time unit
-                # Don not check. Instead, set their mechs' units to default hours
+                # Only some parameters requested for checking the device time unit while others have specified a time unit at the DegPrmMdl level
+                # Do not check the device level. Instead, set the non-specified mechs' units to default hours
                 for prm in prm_flag_dict:
                     if prm_flag_dict[prm] is True:
                         for mech in prm_mdls[prm].mech_mdl_list:

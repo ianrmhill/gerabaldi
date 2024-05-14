@@ -198,6 +198,11 @@ def _inverse_time_transformer(duration: timedelta, time_unit: str) -> float:
 
 
 def _handle_prm_time_unit(prm) -> bool:
+    """
+    Starting at the DegMechMdl/FailMechMdl level, check if the user has specified any time units. If all none, then
+    move to the DegPrmMdl level, if still none, then raise the check_device_time_unit flag, signaling the need 
+    to check for time units at the DeviceMdl level.
+    """
     check_device_time_unit = False
     # Check if the parameter's mech_time_unit_dict is all None, if yes, that means the user hasn't specify any
     if all(value is None for value in prm.mech_time_unit_dict.values()):
@@ -216,5 +221,5 @@ def _handle_prm_time_unit(prm) -> bool:
                 logger.warning("{}'s time unit is set to hours by default.".format(key))
             if prm.time_unit:
                 logger.warning("{}'s time unit is overlooked because some of its MechMdl objects have time unit specified.".format(prm.name))
-                #TODO: check for device's time unit.
+                #TODO: check for device's time unit. ??
     return check_device_time_unit
