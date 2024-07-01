@@ -99,6 +99,7 @@ def _sim_stress_step(step: StrsSpec, sim_state: SimState, dev_mdl: DeviceMdl,
         for mech in equiv_times:
             #print(mech_time_unit_dict[mech])
             mech_time_unit = mech_time_unit_dict[mech]
+            # FIXME convert equiv_times to timedelta according to mech's time unit.
             equiv_times[mech] += _inverse_time_transformer(step.duration, mech_time_unit)  # Convert timedelta to seconds then to hours and add with equivalent time,
             # TODO: refer to parameter's property for specified time unit, need to be same as equiv time, this is the "converting to raw values" part
             # This is within one object of DegPrmMdl, so refer to that. However, each DegPrmMdl calls calc_equiv_strs_times or calc_deg_vals

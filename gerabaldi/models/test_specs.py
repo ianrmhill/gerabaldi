@@ -8,7 +8,7 @@ from __future__ import annotations
 from datetime import timedelta
 
 from gerabaldi.exceptions import UserConfigError
-from gerabaldi.helpers import _time_transformer
+from gerabaldi.helpers import _time_transformer, _check_time_unit
 
 __all__ = ['MeasSpec', 'StrsSpec', 'TestSpec']
 
@@ -73,9 +73,7 @@ class StrsSpec:
         """
         self.conditions = conditions
         # Currently, test lengths use units of hours, but are provided as timedelta objects
-        if time_unit not in ['hours', 'seconds', 'milliseconds', 'years', 'h', 's', 'ms', 'y']: # TODO: make it global
-            raise UserConfigError("Incorrect time unit. The valid options are "
-                                  "'hours' ('h'), 'seconds' ('s'), 'milliseconds' ('ms'), and 'years' ('y').")
+        _check_time_unit(time_unit)
         if type(duration) in [int, float]:
             duration = _time_transformer(duration, time_unit)
         # Ensure the duration of the stress phase/cell is not 0
@@ -158,9 +156,7 @@ class TestSpec:
         else:
             # If we are looping the steps until some amount of elapsed time, we first convert the time for comparison
             if type(loop_for_duration) != timedelta:
-                if time_unit not in ['hours', 'seconds', 'milliseconds', 'years', 'h', 's', 'ms', 'y']: # TODO
-                    raise UserConfigError("Incorrect time unit. The valid options are "
-                                          "'hours' ('h'), 'seconds' ('s'), 'milliseconds' ('ms'), and 'years' ('y').")
+                _check_time_unit(time_unit)
                 duration = _time_transformer(loop_for_duration, time_unit)
             else:
                 duration = loop_for_duration

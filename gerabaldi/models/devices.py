@@ -762,12 +762,12 @@ class DegPrmMdl(LatentMdl):
         # Create attributes for mechanism models based on the model names
         self.mech_mdl_list = []
         self.mech_time_unit_dict = {}
-        if type(deg_mech_mdls) == dict:
+        if isinstance(deg_mech_mdls, dict):
             for mech in deg_mech_mdls:
                 deg_mech_mdls[mech].name = mech
                 setattr(self, f"_{mech}_mdl", deg_mech_mdls[mech])
                 self.mech_mdl_list.append(mech)
-                #if (deg_mech_mdls[mech].time_unit):  # If this mechanism has a specified time unit, store it to the dict. If all mechanisms have none, then the dict will be empty
+                # if (deg_mech_mdls[mech].time_unit):  # If this mechanism has a specified time unit, store it to the dict. If all mechanisms have none, then the dict will be empty
                 self.mech_time_unit_dict[mech] = deg_mech_mdls[mech].time_unit
                 #else:
                     #self.mech_time_unit_dict[mech] =
@@ -925,6 +925,7 @@ class DegPrmMdl(LatentMdl):
         # The conditional model is set to its unitary value, i.e. won't affect our output, as the 'true'
         # underlying degradation is referenced to the standard value, specifically the conditions where the conditional
         # shift model leaves the base value unchanged
+        # FIXME: convert from timedelta to row values according to the mech's time unit.
         arg_vals = {'init': init_vals, 'cond': self.cond_mdl.unitary}
 
         # Calculate the degradation for the mechanism models
@@ -1157,7 +1158,7 @@ class DeviceMdl:
         self.prm_time_unit_dict = {}  # A dictionary that stores the time unit for each DegPrmMdl object
 
         # Check the time unit at the device level
-        if type(prm_mdls) == dict:  # If we have multiple parameters
+        if isinstance(prm_mdls, dict):  # If we have multiple parameters
             prm_flag_dict = {}  # check_device_time_unit flags of parameters
             for prm in prm_mdls:
                 prm_mdls[prm].name = prm
@@ -1169,7 +1170,7 @@ class DeviceMdl:
             if all(flag is True for flag in prm_flag_dict.values()):
                 # All parameters requested to check the device time unit
                 if self.time_unit:
-                    # Set all mechs of all prms to this devide time unit
+                    # Set all mechs of all prms to this device time unit
                     for prm in self.prm_mdl_list:
                         if (isinstance(prm_mdls[prm], DegPrmMdl)):
                             for mech in prm_mdls[prm].mech_mdl_list:
