@@ -195,30 +195,3 @@ def _inverse_time_transformer(duration: timedelta, time_unit: str) -> float:
         transformed_time = duration.total_seconds() / SECONDS_PER_YEAR
 
     return transformed_time
-
-
-def _handle_prm_time_unit(prm) -> bool:
-    """
-    Starting at the DegMechMdl/FailMechMdl level, check if the user has specified any time units. If all none, then
-    move to the DegPrmMdl level, if still none, then raise the check_device_time_unit flag, signaling the need 
-    to check for time units at the DeviceMdl level.
-    """
-    check_device_time_unit = False
-    # Check if the parameter's mech_time_unit_dict is all None, if yes, that means the user hasn't specify any
-    if all(value is None for value in prm.mech_time_unit_dict.values()):
-        # mech_time_unit_dict is all None. Need to check the parameter's time unit
-        # If the parameter's unit is set, set all its mechs unit accordingly
-        if (prm.time_unit):
-            for key in prm.mech_time_unit_dict:
-                prm.mech_time_unit_dict[key] = prm.time_unit
-        else:
-            check_device_time_unit = True  # Need to check for device time unit for this parameter
-    # Some mechanisms in this parameter have a time unit, while some have none, set those who have none to hours
-    elif (None in prm.mech_time_unit_dict.values()):  # FIXME: fix this, all mechanisms should be independent. 
-        for key in prm.mech_time_unit_dict:
-            if prm.mech_time_unit_dict[key] is None:
-                prm.mech_time_unit_dict[key] = "hours"
-                logger.warning("{}'s time unit is set to hours by default.".format(key))
-            if prm.time_unit:
-                logger.warning("{}'s time unit is overlooked because some of its MechMdl objects have time unit specified.".format(prm.name))
-    return check_device_time_unit
