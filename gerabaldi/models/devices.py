@@ -537,6 +537,14 @@ class FailMechMdl(MechMdl):
         _check_time_unit(time_unit)
         self.time_unit = time_unit
 
+    def set_time_unit(self, prm_time_unit: str = None) -> None:
+        if self.time_unit is None:
+            if (prm_time_unit is None):
+                self.time_unit = "h"
+                logger.warning("No specified time unit for {}, defaulted to hours.".format(self.name))
+            else:
+                self.time_unit = prm_time_unit
+
     def calc_equiv_strs_time(self, deg_val: int | float, init_val: int | float,
                              strs_conds: dict, latents: dict, dims: tuple) -> float:
         """
@@ -791,8 +799,9 @@ class DegPrmMdl(LatentMdl):
     def propagate_time_unit(self, dev_time_unit: str = None) -> None:
         time_unit = self.time_unit if self.time_unit else dev_time_unit
         for mech in self.mech_mdl_list:
-            degMechMdl = self.mech_mdl(mech)
-            degMechMdl.set_time_unit(time_unit)
+            if (isinstance(self.mech_mdl(mech), (DegMechMdl, FailMechMdl))):
+                mech_object = self.mech_mdl(mech)
+                mech_object.set_time_unit(time_unit)
 
     def mech_mdl(self, mdl):
         """
@@ -1173,7 +1182,6 @@ class DeviceMdl:
                 raise UserConfigError('Please specify a name for the device parameter.')
             setattr(self, f"_{prm_mdls.name}_mdl", prm_mdls)
             self.prm_mdl_list.append(prm_mdls.name)
-
         self.propagate_time_unit()
 
     def propagate_time_unit(self) -> None:
