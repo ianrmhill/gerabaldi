@@ -1,10 +1,12 @@
-import copy
+import gerabaldi
 import pytest
 from datetime import timedelta
 
+
 from gerabaldi.models.devices import *
+from gerabaldi.models import *
 from gerabaldi.exceptions import UserConfigError, ArgOverwriteWarning
-from gerabaldi.models.test_specs import StrsSpec
+#from gerabaldi.models.test_specs import StrsSpec
 from gerabaldi.helpers import _time_transformer
 
 HOURS_PER_YEAR = 8760
@@ -134,7 +136,7 @@ def test_SimReport_timescale():
     assert (e1, e2) == ('Years', SECONDS_PER_YEAR)
 
 
-def test_time_unit_propagration():
+def test_time_unit_propagation():
     degMech0 = DegMechMdl(mdl_name="degMech0", time_unit="h")
     degMech1 = DegMechMdl(mdl_name="degMech1", time_unit="s")
     degMech2 = DegMechMdl(mdl_name="degMech2")
@@ -176,3 +178,48 @@ def test_time_unit_propagration():
     assert devMdl1.prm_mdl("prmMdl0").mech_mdl("failMech0").time_unit == "ms"
     assert devMdl1.prm_mdl("prmMdl0").mech_mdl("failMech1").time_unit == "y"
     assert devMdl1.prm_mdl("prmMdl1").mech_mdl("degMech3").time_unit == "h"
+
+
+def test_time_unit():
+    def eqn(a, temp, time): return a * time * temp
+    dev_mdl = DeviceMdl(DegPrmMdl(DegMechMdl(mech_eqn=eqn, mdl_name="test_mdl", time_unit="s", a=LatentVar(deter_val=1)), prm_name="current"))
+    meas = MeasSpec({"current": 1}, {"temp": 25})
+    strs1 = StrsSpec({"temp": 1}, timedelta(hours=1))
+    strs2 = StrsSpec({"temp": 2}, timedelta(hours=1))
+    test = TestSpec([strs1, meas, strs2, meas])
+
+    test_env = PhysTestEnv()
+    init_state = gerabaldi.gen_init_state(dev_mdl, test.calc_samples_needed(), test.num_chps, test.num_lots)
+
+    report = gerabaldi.simulate(test, dev_mdl, test_env, init_state)
+
+    assert round(report.measurements["measured"][0]) == 3600
+    assert round(report.measurements["measured"][1]) == 10800
+    # ------------------------------------------------------------------------------------------------------------------------------------
+    dev_mdl = DeviceMdl(DegPrmMdl(DegMechMdl(mech_eqn=eqn, mdl_name="test_mdl", time_unit="ms", a=LatentVar(deter_val=1)), prm_name="current"))
+    meas = MeasSpec({"current": 1}, {"temp": 25})
+    strs1 = StrsSpec({"temp": 1}, 1, time_unit="h")
+    strs2 = StrsSpec({"temp": 2}, 1000000, time_unit="ms")
+    test = TestSpec([strs1, meas, strs2, meas])
+
+    test_env = PhysTestEnv()
+    init_state = gerabaldi.gen_init_state(dev_mdl, test.calc_samples_needed(), test.num_chps, test.num_lots)
+
+    report = gerabaldi.simulate(test, dev_mdl, test_env, init_state)
+
+    assert round(report.measurements["measured"][0]) == 3600000
+    assert round(report.measurements["measured"][1]) == 5600000
+    # ------------------------------------------------------------------------------------------------------------------------------------
+    dev_mdl = DeviceMdl(DegPrmMdl(DegMechMdl(mech_eqn=eqn, mdl_name="test_mdl", time_unit="y", a=LatentVar(deter_val=1)), prm_name="current"))
+    meas = MeasSpec({"current": 1}, {"temp": 25})
+    strs1 = StrsSpec({"temp": 1}, 1, time_unit="y")
+    strs2 = StrsSpec({"temp": 2}, timedelta(days=356))
+    test = TestSpec([strs1, meas, strs2, meas])
+
+    test_env = PhysTestEnv()
+    init_state = gerabaldi.gen_init_state(dev_mdl, test.calc_samples_needed(), test.num_chps, test.num_lots)
+
+    report = gerabaldi.simulate(test, dev_mdl, test_env, init_state)
+
+    assert round(report.measurements["measured"][0]) == 1
+    assert round(report.measurements["measured"][1]) == 3
