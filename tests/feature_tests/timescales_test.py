@@ -196,7 +196,7 @@ def test_time_unit():
     assert round(report.measurements["measured"][0]) == 3600
     assert round(report.measurements["measured"][1]) == 10800
     # ------------------------------------------------------------------------------------------------------------------------------------
-    dev_mdl = DeviceMdl(DegPrmMdl(DegMechMdl(mech_eqn=eqn, mdl_name="test_mdl", time_unit="ms", a=LatentVar(deter_val=1)), prm_name="current"))
+    dev_mdl = DeviceMdl(DegPrmMdl(DegMechMdl(mech_eqn=eqn, mdl_name="test_mdl", a=LatentVar(deter_val=1)), prm_name="current", time_unit="ms"))
     meas = MeasSpec({"current": 1}, {"temp": 25})
     strs1 = StrsSpec({"temp": 1}, 1, time_unit="h")
     strs2 = StrsSpec({"temp": 2}, 1000000, time_unit="ms")
@@ -210,10 +210,24 @@ def test_time_unit():
     assert round(report.measurements["measured"][0]) == 3600000
     assert round(report.measurements["measured"][1]) == 5600000
     # ------------------------------------------------------------------------------------------------------------------------------------
-    dev_mdl = DeviceMdl(DegPrmMdl(DegMechMdl(mech_eqn=eqn, mdl_name="test_mdl", time_unit="y", a=LatentVar(deter_val=1)), prm_name="current"))
+    dev_mdl = DeviceMdl(DegPrmMdl(DegMechMdl(mech_eqn=eqn, mdl_name="test_mdl", a=LatentVar(deter_val=1)), prm_name="current"), time_unit="y")
     meas = MeasSpec({"current": 1}, {"temp": 25})
     strs1 = StrsSpec({"temp": 1}, 1, time_unit="y")
     strs2 = StrsSpec({"temp": 2}, timedelta(days=356))
+    test = TestSpec([strs1, meas, strs2, meas])
+
+    test_env = PhysTestEnv()
+    init_state = gerabaldi.gen_init_state(dev_mdl, test.calc_samples_needed(), test.num_chps, test.num_lots)
+
+    report = gerabaldi.simulate(test, dev_mdl, test_env, init_state)
+
+    assert round(report.measurements["measured"][0]) == 1
+    assert round(report.measurements["measured"][1]) == 3
+    # ------------------------------------------------------------------------------------------------------------------------------------
+    dev_mdl = DeviceMdl(DegPrmMdl(DegMechMdl(mech_eqn=eqn, mdl_name="test_mdl", a=LatentVar(deter_val=1)), prm_name="current"))  # Should be defaulted to hours
+    meas = MeasSpec({"current": 1}, {"temp": 25})
+    strs1 = StrsSpec({"temp": 1}, 3600, time_unit="s")
+    strs2 = StrsSpec({"temp": 2}, timedelta(hours=1))
     test = TestSpec([strs1, meas, strs2, meas])
 
     test_env = PhysTestEnv()
