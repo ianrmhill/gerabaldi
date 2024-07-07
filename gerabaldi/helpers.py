@@ -164,13 +164,14 @@ def _loop_compute(eqn, args_dict: dict, dims: tuple):
 
 
 def _check_time_unit(time_unit: str):
+    """Check if the provided time unit is legal."""
     if (time_unit not in ['hours', 'seconds', 'milliseconds', 'years', 'h', 's', 'ms', 'y']) and (time_unit is not None):
         raise UserConfigError("Incorrect time unit. The valid options are "
                                 "'hours' ('h'), 'seconds' ('s'), 'milliseconds' ('ms'), and 'years' ('y').")
 
 
 def _time_transformer(duration: int | float, time_unit: str) -> timedelta:
-    """TODO: doc str"""
+    """Transform raw time value to timedelta."""
     if time_unit in ['hours', 'h']:
         transformed_time = timedelta(hours=duration)
     elif time_unit in ['seconds', 's']:
