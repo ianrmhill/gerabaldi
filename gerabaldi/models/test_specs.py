@@ -67,9 +67,10 @@ class StrsSpec:
             Mapping from environmental stress condition names to target values for those conditions
         duration: timedelta or float or int
             Duration of the stress phase
-        TODO: doc str
         name: str, optional
             Descriptive name for the stress specification (default 'unspecified')
+        time_unit: str, optional
+            The time unit of the stress specification
         """
         self.conditions = conditions
         # Currently, test lengths use units of hours, but are provided as timedelta objects
@@ -145,7 +146,8 @@ class TestSpec:
             The test steps to append to the ordered list of steps already included in the test
         loop_for_duration: timedelta or int or float, optional
             If provided, the steps will be appended repeatedly until the added stress time surpasses this duration
-        TODO: doc str
+        time_unit: str, optional
+            The time unit of the steps
         """
         # If not looping, simply add the steps onto the test list
         if loop_for_duration is None:

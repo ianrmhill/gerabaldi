@@ -95,11 +95,9 @@ def _sim_stress_step(step: StrsSpec, sim_state: SimState, dev_mdl: DeviceMdl,
             sim_state.curr_deg_mech_vals[prm], strs_conds[prm],
             sim_state.init_deg_mech_vals[prm], sim_state.latent_var_vals[prm])  # Equivalent time in specified time units
         # Now add on the time for the current stress phase
-        # NOTE: I didn't convert the equivalent times to other time units, instead, I converted the duration from other units to hours
         for mech in equiv_times:
             mech_object = degPrmMdl.mech_mdl(mech)
             mech_time_unit = mech_object.time_unit
-            # FIXME convert equiv_times to timedelta according to mech's time unit.
             equiv_times[mech] += _inverse_time_transformer(step.duration, mech_time_unit)
         # 3. Simulate the degradation for each device after adding the equivalent prior stress time
         sim_state.curr_prm_vals[prm], sim_state.curr_deg_mech_vals[prm] = dev_mdl.prm_mdl(prm).calc_deg_vals(

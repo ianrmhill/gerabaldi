@@ -444,7 +444,8 @@ class DegMechMdl(MechMdl):
             Descriptive name for the mechanism model
         unitary_val: int
             The value for the mechanism output that results in no effect to the parent parameter's value (default 0)
-        TODO: doc str
+        time_unit: str, optional
+            The time unit of the mechanism model
         **latent_vars: dict of LatentVar, optional
             Latent variable models used as part of the mechanism's compute equation
         """
@@ -529,7 +530,8 @@ class FailMechMdl(MechMdl):
             Descriptive name for the mechanism model
         unitary_val: int
             The value for the mechanism output that results in no effect to the parent parameter's value (default 0)
-        TODO: doc str
+        time_unit: str, optional
+            The time unit of the mechanism model
         **latent_vars: dict of LatentVar, optional
             Latent variable models used as part of the mechanism's compute equation
         """
@@ -767,7 +769,8 @@ class DegPrmMdl(LatentMdl):
             The name of the degraded parameter (default None)
         array_computable: bool, optional
             Flag to indicate whether the parameter's compute equation can accept numpy arrays (default True)
-        TODO: doc str
+        time_unit: str, optional
+            The time unit of the parameter model
         **latent_vars: dict of LatentVar, optional
             Any latent variables used within the degraded parameter's compute equation
         """
@@ -941,7 +944,6 @@ class DegPrmMdl(LatentMdl):
         # The conditional model is set to its unitary value, i.e. won't affect our output, as the 'true'
         # underlying degradation is referenced to the standard value, specifically the conditions where the conditional
         # shift model leaves the base value unchanged
-        # FIXME: convert from timedelta to row values according to the mech's time unit.
         arg_vals = {'init': init_vals, 'cond': self.cond_mdl.unitary}
 
         # Calculate the degradation for the mechanism models
@@ -1164,7 +1166,8 @@ class DeviceMdl:
             Single parameter model or a mapping from parameter names to parameter models
         name: str
             Descriptive name for the device model
-        TODO: doc str
+        time_unit: str, optional
+            The time unit of the device model
         """
         _check_time_unit(time_unit)
         self.time_unit = time_unit
