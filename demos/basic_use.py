@@ -62,9 +62,8 @@ def run_simulation(save_file: str = None):
 
 
 def visualize(report):
+    report.convert_report_time("hours")
     measured = report.measurements
-    # Change time deltas to hours for processing
-    measured['time'] = measured['time'].apply(lambda time, **kwargs: time.total_seconds() / SECONDS_PER_HOUR, axis=1)
 
     # Set up the figure area
     colours = ['mediumpurple', 'green', 'cornflowerblue', 'aqua', 'limegreen']
