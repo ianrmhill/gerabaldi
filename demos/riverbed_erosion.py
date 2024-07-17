@@ -20,8 +20,6 @@ ticker = _on_demand_import('matplotlib.ticker', 'matplotlib')
 sb = _on_demand_import('seaborn')
 
 DATA_FILE_NAME = 'erosion_report'
-SECONDS_PER_HOUR = 3600
-HOURS_PER_YEAR = 8760
 
 SAMPLES_PER_RIVER = 10
 RIVERS_SAMPLED = 5
@@ -97,15 +95,13 @@ def run_simulation(save_file: str = None):
 
 
 def visualize(report):
+    report.convert_report_time("years")
     measured = report.measurements
 
     # Reformat dataframe to get ready for plotting
     measured = measured.set_index(['param', 'device #', 'chip #'])
     measured = measured.sort_index()
     measured = measured.drop('lot #', axis=1)
-    # Change time deltas to hours then years for processing
-    measured['time'] = measured['time'].apply(lambda time, **kwargs: time.total_seconds() / SECONDS_PER_HOUR, axis=1)
-    measured['time'] = measured['time'] / HOURS_PER_YEAR
 
     # Set up the plots
     sb.set_theme(style='whitegrid', font='Times New Roman')

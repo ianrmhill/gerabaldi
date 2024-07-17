@@ -13,7 +13,7 @@ from pathlib import Path
 
 from gerabaldi.models.test_specs import TestSpec
 from gerabaldi.exceptions import ArgOverwriteWarning
-from gerabaldi.helpers import _convert_time, logger
+from gerabaldi.helpers import _convert_time, _check_time_unit, _inverse_time_transformer, logger
 
 __all__ = ['SimReport']
 
@@ -211,3 +211,11 @@ class SimReport:
             logger.info(f"Successfully exported test report {self.test_name} to file.")
         else:
             return report_json
+
+    def convert_report_time(self, time_unit: str = "hours") -> None:
+        """
+        Convert the timedelta in the dataframe to raw values according to the specified time unit.
+        """
+        _check_time_unit(time_unit)
+        self.time_unit = time_unit
+        self.measurements['time'] = self.measurements['time'].apply(lambda time: _inverse_time_transformer(time, self.time_unit))

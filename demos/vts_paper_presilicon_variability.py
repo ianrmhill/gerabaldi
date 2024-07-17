@@ -27,7 +27,6 @@ DATA_FILES = {'Current Process: Ramped Cycling': 'curr_ramp_report', 'Current Pr
 
 CELSIUS_TO_KELVIN = 273.15
 BOLTZMANN_CONST_EV = 8.617e-5
-SECONDS_PER_HOUR = 3600
 
 # To obtain results shown in the VTS paper, set NUM_DEVICES = 10, NUM_CHIPS = 10, NUM_LOTS = 10
 NUM_DEVICES = 5
@@ -158,15 +157,15 @@ def run_simulation(save_files: dict = None):
 
 def visualize(rprts):
     measured = {}
+
     for sim in rprts:
+        rprts[sim].convert_report_time("hours")
         measured[sim] = rprts[sim].measurements
 
     # Reformat dataframe to get ready for plotting
     for sim in measured:
         measured[sim] = measured[sim].set_index(['param', 'device #', 'chip #', 'lot #'])
         measured[sim] = measured[sim].sort_index()
-        measured[sim]['time'] = measured[sim]['time'].apply(
-            lambda time, **kwargs: time.total_seconds() / SECONDS_PER_HOUR, axis=1)
 
     ### 5. Process and visualize results for the user to examine ###
     sb.set_theme(style='ticks', font='Times New Roman')
