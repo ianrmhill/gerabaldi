@@ -62,7 +62,7 @@ def run_simulation(save_file: str = None):
 
 
 def visualize(report):
-    report.convert_report_time("hours")
+    report.convert_report_time('hours')
     measured = report.measurements
 
     # Set up the figure area

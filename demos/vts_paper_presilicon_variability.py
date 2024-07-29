@@ -102,13 +102,13 @@ def run_simulation(save_files: dict = None):
     dev_mdl = DeviceMdl({'v_th': DegPrmMdl(
         deg_mech_mdls={
             'bti': DegMechMdl(
-                bti_vth_shift_empirical, time_unit=None,  # mech_eqn
-                a_0=LatentVar(Normal(0.006, 0.0005)),  # latent_vars
+                bti_vth_shift_empirical,
+                a_0=LatentVar(Normal(0.006, 0.0005)),
                 e_aa=LatentVar(Normal(-0.05, 0.0002), chp_vrtn_mdl=Normal(1, 0.0003), lot_vrtn_mdl=Normal(1, 0.0001)),
                 alpha=LatentVar(Normal(9.5, 0.002), chp_vrtn_mdl=Normal(1, 0.005)),
                 n=LatentVar(Normal(0.4, 0.0005))),
             'hci': DegMechMdl(
-                hci_vth_shift_empirical, time_unit=None,
+                hci_vth_shift_empirical,
                 a_0=LatentVar(Normal(0.1, 0.004)),
                 n=LatentVar(Normal(0.62, 0.003)),
                 alpha=LatentVar(Normal(7.2, 0.03), chp_vrtn_mdl=Normal(1, 0.04)),
@@ -117,8 +117,7 @@ def run_simulation(save_files: dict = None):
             )},
         init_val_mdl=InitValMdl(init_val=LatentVar(
             Normal(0.42, 0.0001), chp_vrtn_mdl=Normal(0, 0.0002), lot_vrtn_mdl=Normal(0, 0.0003), vrtn_type='offset')),
-        compute_eqn=v_th_eqn,
-        time_unit=None
+        compute_eqn=v_th_eqn
     ), 'amp_gain': CircPrmMdl(
         amp_gain_eqn,
         u_n=LatentVar(deter_val=1),
@@ -126,7 +125,7 @@ def run_simulation(save_files: dict = None):
         w=LatentVar(deter_val=8),
         l=LatentVar(deter_val=2),
         v_e=LatentVar(deter_val=5)
-    )}, time_unit=None)
+    )})
 
     ########################################################################
     ### 4. Simulate the tests                                            ###
@@ -157,9 +156,8 @@ def run_simulation(save_files: dict = None):
 
 def visualize(rprts):
     measured = {}
-
     for sim in rprts:
-        rprts[sim].convert_report_time("hours")
+        rprts[sim].convert_report_time('hours')
         measured[sim] = rprts[sim].measurements
 
     # Reformat dataframe to get ready for plotting

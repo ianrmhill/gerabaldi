@@ -49,7 +49,7 @@ def oxide_failed(init, cond, threshold, defect0, defect1, defect2, defect3, defe
     layout = np.array([defect0, defect1, defect2, defect3, defect4, defect5,
                        defect6, defect7, defect8, defect9, defect10, defect11]).reshape((3, 4))
     # Determine defects formed based on whether the stochastic defect formation value has hit a threshold
-    oxide = pd.DataFrame(layout).applymap(lambda deg: 1 if deg > threshold else 0)
+    oxide = pd.DataFrame(layout).map(lambda deg: 1 if deg > threshold else 0)
     # Identify if any of the columns in our oxide layer have fully defected
     conductive_col = False
     for i in range(len(oxide.columns)):
@@ -109,7 +109,7 @@ def run_simulation(save_files: dict = None):
     weekly_idle_use = StrsSpec({'temp': 30 + CELSIUS_TO_KELVIN, 'v_g': 0.87}, 122, 'Idle State')
 
     check_for_fails = MeasSpec(
-        {'tddb': NUM_SAMPLES}, {'temp': 35 + CELSIUS_TO_KELVIN, 'v_g': 0.9}, print_action=True, name='FailCheck')
+        {'tddb': NUM_SAMPLES}, {'temp': 35 + CELSIUS_TO_KELVIN, 'v_g': 0.9}, name='FailCheck')
 
     field_use_sim = TestSpec([check_for_fails], name='Field Use Sim', description='Test spec designed to represent a \
         real-world use scenario for a consumer device with downtime and higher stress periods.')

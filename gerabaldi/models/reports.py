@@ -194,7 +194,7 @@ class SimReport:
                                       "defaulting to seconds.")
 
         meas_cpy = self.measurements.copy()
-        meas_cpy['time'] = meas_cpy['time'].apply(_convert_time, units=div_time, axis=1) # apply to axis 1
+        meas_cpy['time'] = meas_cpy['time'].apply(_convert_time, units=div_time, axis=1)
         report_json['Measurements'] = meas_cpy.to_json()
         strs_cpy = self.test_summary.copy()
         strs_cpy['duration'] = strs_cpy['duration'].apply(_convert_time, units=div_time, axis=1)

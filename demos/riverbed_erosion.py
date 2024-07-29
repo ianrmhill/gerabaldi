@@ -95,7 +95,7 @@ def run_simulation(save_file: str = None):
 
 
 def visualize(report):
-    report.convert_report_time("years")
+    report.convert_report_time('years')
     measured = report.measurements
 
     # Reformat dataframe to get ready for plotting

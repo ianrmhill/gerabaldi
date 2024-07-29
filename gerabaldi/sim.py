@@ -87,18 +87,15 @@ def _sim_stress_step(step: StrsSpec, sim_state: SimState, dev_mdl: DeviceMdl,
     strs_conds = test_env.gen_env_cond_vals(step.conditions, deg_prm_list, report, dev_mdl, 'stress')
 
     for prm in deg_prm_list:
-        degPrmMdl = dev_mdl.prm_mdl(prm)
         # 2. Calculate the equivalent stress times that would have been needed under the generated stress conditions to
         # obtain the prior degradation values. First we calculate the equivalent time to reach the current degradation
         equiv_times = dev_mdl.prm_mdl(prm).calc_equiv_strs_times(
             (report.num_lots, report.num_chps, report.dev_counts[prm]),
             sim_state.curr_deg_mech_vals[prm], strs_conds[prm],
-            sim_state.init_deg_mech_vals[prm], sim_state.latent_var_vals[prm])  # Equivalent time in specified time units
+            sim_state.init_deg_mech_vals[prm], sim_state.latent_var_vals[prm])
         # Now add on the time for the current stress phase
         for mech in equiv_times:
-            mech_object = degPrmMdl.mech_mdl(mech)
-            mech_time_unit = mech_object.time_unit
-            equiv_times[mech] += _inverse_time_transformer(step.duration, mech_time_unit)
+            equiv_times[mech] += _inverse_time_transformer(step.duration, dev_mdl.prm_mdl(prm).mech_mdl(mech).time_unit)
         # 3. Simulate the degradation for each device after adding the equivalent prior stress time
         sim_state.curr_prm_vals[prm], sim_state.curr_deg_mech_vals[prm] = dev_mdl.prm_mdl(prm).calc_deg_vals(
             (report.num_lots, report.num_chps, report.dev_counts[prm]),

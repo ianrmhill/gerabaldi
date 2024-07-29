@@ -55,10 +55,7 @@ class StrsSpec:
     name: str
         Optional descriptive name for the stress specification
     """
-    def __init__(self,
-                 conditions: dict,
-                 duration: timedelta | int | float,
-                 name: str = 'unspecified',
+    def __init__(self, conditions: dict, duration: timedelta | int | float, name: str = 'unspecified',
                  time_unit: str = 'hours'):
         """
         Parameters
@@ -75,7 +72,7 @@ class StrsSpec:
         self.conditions = conditions
         # Currently, test lengths use units of hours, but are provided as timedelta objects
         _check_time_unit(time_unit)
-        if type(duration) in [int, float]:
+        if type(duration) is not timedelta:
             duration = _time_transformer(duration, time_unit)
         # Ensure the duration of the stress phase/cell is not 0
         if duration == timedelta():
@@ -133,9 +130,7 @@ class TestSpec:
         self.description = description
         self.name = name
 
-    def append_steps(self,
-                     steps: MeasSpec | StrsSpec | list,
-                     loop_for_duration: timedelta | int | float = None,
+    def append_steps(self, steps: MeasSpec | StrsSpec | list, loop_for_duration: timedelta | int | float = None,
                      time_unit: str = 'hours'):
         """
         Append one or more test instruction steps to the end of the existing list of test steps
@@ -157,11 +152,11 @@ class TestSpec:
                 self.steps.append(steps)
         else:
             # If we are looping the steps until some amount of elapsed time, we first convert the time for comparison
-            if type(loop_for_duration) != timedelta:
+            if type(loop_for_duration) is timedelta:
+                duration = loop_for_duration
+            else:
                 _check_time_unit(time_unit)
                 duration = _time_transformer(loop_for_duration, time_unit)
-            else:
-                duration = loop_for_duration
 
             # Ensure duration is not 0
             t = timedelta()
