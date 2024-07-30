@@ -10,6 +10,7 @@ import numpy as np
 from scipy.optimize import minimize_scalar
 from typing import Callable
 
+from gerabaldi.math import minimize
 from gerabaldi.models.random_vars import RandomVar, Deterministic
 from gerabaldi.models.states import SimState
 from gerabaldi.exceptions import InvalidTypeError, UserConfigError
@@ -487,8 +488,8 @@ class DegMechMdl(MechMdl):
 
         # Minimize the difference between the output and the target/observed value using scipy optimizer
         # Since we are minimizing time we use the bounded method to ensure our time doesn't go negative
-        return minimize_scalar(residue, args=(deg_val, strs_conds, latents),
-                               method='bounded', bounds=(0, 1e10)).x
+        return minimize(residue, extra_args={'curr_deg_val': deg_val, 'conds': strs_conds, 'ltnts': latents},
+                        bounds=(1e-3, 1e10), maxiter=50, log_gold=True)
 
 
 class FailMechMdl(MechMdl):
@@ -877,7 +878,7 @@ class DegPrmMdl(LatentMdl):
                          'strs_conds': strs_conds, 'latents': latents[mech], 'dims': strs_dims}
             # Currently we always loop compute because the numerical method used to calculate equivalent stress time
             # from the SciPy library is not array computable
-            equiv_times[mech] = _loop_compute(self.mech_mdl(mech).calc_equiv_strs_time, args_dict, strs_dims)
+            equiv_times[mech] = self.mech_mdl(mech).calc_equiv_strs_time(**args_dict)
         return equiv_times
 
     def calc_deg_vals(self, strs_dims: tuple, times: dict, strs_conds: dict,

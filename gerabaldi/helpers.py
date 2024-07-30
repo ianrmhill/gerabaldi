@@ -59,7 +59,7 @@ def configure_logger(logging_level: int = None,
     custom_stream_handler = logging.StreamHandler()
     configure_logger(logging_level=logging.INFO, stream_handler=custom_stream_handler)
     """
-    logger = logging.getLogger("gerabaldi")
+    logger = logging.getLogger('gerabaldi')
     # If the user has provided a global logging level, set accordingly
     if logging_level:
         logger.setLevel(logging_level)
