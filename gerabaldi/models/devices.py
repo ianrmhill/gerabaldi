@@ -13,7 +13,7 @@ from typing import Callable
 from gerabaldi.models.random_vars import RandomVar, Deterministic
 from gerabaldi.models.states import SimState
 from gerabaldi.exceptions import InvalidTypeError, UserConfigError
-from gerabaldi.helpers import _on_demand_import, _loop_compute
+from gerabaldi.helpers import logger, _on_demand_import, _loop_compute
 
 # Optional imports are loaded using a helper function that suppresses import errors until attempted use
 pymc = _on_demand_import('pymc')
@@ -336,12 +336,14 @@ class MechMdl(LatentMdl):
 
     This class should not be instantiated directly, use an inheriting class.
     """
-    def __init__(self, mech_eqn: Callable = None, mdl_name: str = None, unitary_val: int = 0, **latent_vars: LatentVar):
+    def __init__(self, mech_eqn: Callable = None, mdl_name: str = None, unitary_val: int = 0, time_unit: str = None,
+                 **latent_vars: LatentVar):
         if not mech_eqn:
             # Default is a non-degrading model, parameter stays the same (i.e. 'fresh') regardless of stress and time
             def no_wear_out(): return unitary_val
             mech_eqn = no_wear_out
         self.unitary = unitary_val
+        self.time_unit = time_unit
         super().__init__(mech_eqn, mdl_name, **latent_vars)
 
     def gen_init_vals(self, num_devs, num_chps, num_lots):
@@ -368,6 +370,14 @@ class MechMdl(LatentMdl):
 
     def calc_equiv_strs_time(self, deg_val, init_val, strs_conds, latents, dims):
         raise NotImplementedError('Mechanism does not define how to compute value changes under time-varying stress')
+
+    def set_time_unit(self, prm_time_unit: str = None) -> None:
+        if self.time_unit is None:
+            if prm_time_unit is None:
+                self.time_unit = 'h'
+                logger.warning(f"No explicit time units for mechanism model {self.name}, defaulting to hours.")
+            else:
+                self.time_unit = prm_time_unit
 
     def calc_deg_vals(self, times: np.ndarray, pre_deg_vals: np.ndarray,
                       strs_conds: dict, latents: dict, dims: tuple) -> np.ndarray:
@@ -434,7 +444,8 @@ class DegMechMdl(MechMdl):
     unitary: int or float
         The value for the mechanism output that results in no effect to the parent parameter's output value
     """
-    def __init__(self, mech_eqn: Callable = None, mdl_name: str = None, unitary_val: int = 0, **latent_vars: LatentVar):
+    def __init__(self, mech_eqn: Callable = None, mdl_name: str = None, unitary_val: int = 0, time_unit: str = None,
+                 **latent_vars: LatentVar):
         """
         Parameters
         ----------
@@ -444,10 +455,12 @@ class DegMechMdl(MechMdl):
             Descriptive name for the mechanism model
         unitary_val: int
             The value for the mechanism output that results in no effect to the parent parameter's value (default 0)
+        time_unit: str, optional
+            The time unit of the mechanism model
         **latent_vars: dict of LatentVar, optional
             Latent variable models used as part of the mechanism's compute equation
         """
-        super().__init__(mech_eqn, mdl_name, unitary_val, **latent_vars)
+        super().__init__(mech_eqn, mdl_name, unitary_val, time_unit, **latent_vars)
 
     def calc_equiv_strs_time(self, deg_val: int | float, init_val: int | float,
                              strs_conds: dict, latents: dict, dims: tuple) -> float:
@@ -508,7 +521,8 @@ class FailMechMdl(MechMdl):
     unitary: int or float
         The value for the mechanism output that results in no effect to the parent parameter's output value
     """
-    def __init__(self, mech_eqn: Callable = None, mdl_name: str = None, unitary_val: int = 0, **latent_vars: LatentVar):
+    def __init__(self, mech_eqn: Callable = None, mdl_name: str = None, unitary_val: int = 0, time_unit: str = None,
+                 **latent_vars: LatentVar):
         """
         Parameters
         ----------
@@ -518,10 +532,12 @@ class FailMechMdl(MechMdl):
             Descriptive name for the mechanism model
         unitary_val: int
             The value for the mechanism output that results in no effect to the parent parameter's value (default 0)
+        time_unit: str, optional
+            The time unit of the mechanism model
         **latent_vars: dict of LatentVar, optional
             Latent variable models used as part of the mechanism's compute equation
         """
-        super().__init__(mech_eqn, mdl_name, unitary_val, **latent_vars)
+        super().__init__(mech_eqn, mdl_name, unitary_val, time_unit, **latent_vars)
 
     def calc_equiv_strs_time(self, deg_val: int | float, init_val: int | float,
                              strs_conds: dict, latents: dict, dims: tuple) -> float:
@@ -729,7 +745,7 @@ class DegPrmMdl(LatentMdl):
     """
     def __init__(self, deg_mech_mdls: DegMechMdl | FailMechMdl | dict, init_val_mdl: InitValMdl = None,
                  cond_shift_mdl: CondShiftMdl = None, compute_eqn: Callable = None,
-                 prm_name: str = None, array_computable: bool = True, **latent_vars: LatentVar):
+                 prm_name: str = None, array_computable: bool = True, time_unit: str = None, **latent_vars: LatentVar):
         """
         Parameters
         ----------
@@ -745,14 +761,17 @@ class DegPrmMdl(LatentMdl):
             The name of the degraded parameter (default None)
         array_computable: bool, optional
             Flag to indicate whether the parameter's compute equation can accept numpy arrays (default True)
+        time_unit: str, optional
+            The time unit of the parameter model
         **latent_vars: dict of LatentVar, optional
             Any latent variables used within the degraded parameter's compute equation
         """
+        self.time_unit = time_unit
         self.init_mdl = init_val_mdl if init_val_mdl else InitValMdl(init_val=LatentVar(deter_val=0))
         self.cond_mdl = cond_shift_mdl if cond_shift_mdl else CondShiftMdl()
         # Create attributes for mechanism models based on the model names
         self.mech_mdl_list = []
-        if type(deg_mech_mdls) == dict:
+        if isinstance(deg_mech_mdls, dict):
             for mech in deg_mech_mdls:
                 deg_mech_mdls[mech].name = mech
                 setattr(self, f"_{mech}_mdl", deg_mech_mdls[mech])
@@ -770,6 +789,13 @@ class DegPrmMdl(LatentMdl):
             compute_eqn = basic_sum
         self.array_compute = array_computable
         super().__init__(compute_eqn, prm_name, **latent_vars)
+
+    def propagate_time_unit(self, dev_time_unit: str = None) -> None:
+        time_unit = self.time_unit if self.time_unit else dev_time_unit
+        for mech in self.mech_mdl_list:
+            if (isinstance(self.mech_mdl(mech), (DegMechMdl, FailMechMdl))):
+                mech_object = self.mech_mdl(mech)
+                mech_object.set_time_unit(time_unit)
 
     def mech_mdl(self, mdl):
         """
@@ -1123,7 +1149,7 @@ class DeviceMdl:
     prm_mdl_list: list of DegPrmMdl or CircPrmMdl
         List of parameters that this device model incorporates, parameter models can be retrieved via the prm_mdl method
     """
-    def __init__(self, prm_mdls: DegPrmMdl | CircPrmMdl | dict, name: str = None):
+    def __init__(self, prm_mdls: DegPrmMdl | CircPrmMdl | dict, name: str = None, time_unit: str = None):
         """
         Parameters
         ----------
@@ -1131,7 +1157,11 @@ class DeviceMdl:
             Single parameter model or a mapping from parameter names to parameter models
         name: str
             Descriptive name for the device model
+        time_unit: str, optional
+            The time unit of the device model
         """
+        self.time_unit = time_unit
+
         self.name = name
         # Create attributes for the degraded parameter models based on the model names
         self.prm_mdl_list = []
@@ -1145,6 +1175,13 @@ class DeviceMdl:
                 raise UserConfigError('Please specify a name for the device parameter.')
             setattr(self, f"_{prm_mdls.name}_mdl", prm_mdls)
             self.prm_mdl_list.append(prm_mdls.name)
+        self.propagate_time_unit()
+
+    def propagate_time_unit(self) -> None:
+        for prm in self.prm_mdl_list:
+            if isinstance(self.prm_mdl(prm), DegPrmMdl):
+                degPrmMdl = self.prm_mdl(prm)
+                degPrmMdl.propagate_time_unit(self.time_unit)
 
     def prm_mdl(self, mdl):
         """

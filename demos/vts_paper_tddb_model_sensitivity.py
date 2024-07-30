@@ -49,7 +49,7 @@ def oxide_failed(init, cond, threshold, defect0, defect1, defect2, defect3, defe
     layout = np.array([defect0, defect1, defect2, defect3, defect4, defect5,
                        defect6, defect7, defect8, defect9, defect10, defect11]).reshape((3, 4))
     # Determine defects formed based on whether the stochastic defect formation value has hit a threshold
-    oxide = pd.DataFrame(layout).applymap(lambda deg: 1 if deg > threshold else 0)
+    oxide = pd.DataFrame(layout).map(lambda deg: 1 if deg > threshold else 0)
     # Identify if any of the columns in our oxide layer have fully defected
     conductive_col = False
     for i in range(len(oxide.columns)):
@@ -83,6 +83,7 @@ def single_test(step_val, test):
 
     tddb_model = DeviceMdl(DegPrmMdl(
         prm_name='tddb',
+        time_unit='hours',
         # We set the initial state to be where all transistor oxides are unbroken,
         # however we could model manufacturing defects by modifying this
         init_val_mdl=InitValMdl(init_val=LatentVar(deter_val=1)),
@@ -104,17 +105,17 @@ def run_simulation(save_files: dict = None):
     ########################################################################
     ### 1. Define the test to simulate                                   ###
     ########################################################################
-    weekly_moderate_use = StrsSpec({'temp': 65 + CELSIUS_TO_KELVIN, 'v_g': 0.9}, 30, 'Moderate Loading')
-    weekly_intensive_use = StrsSpec({'temp': 88 + CELSIUS_TO_KELVIN, 'v_g': 0.92}, 16, 'Heavy Loading')
-    weekly_idle_use = StrsSpec({'temp': 30 + CELSIUS_TO_KELVIN, 'v_g': 0.87}, 122, 'Idle State')
+    weekly_moderate_use = StrsSpec({'temp': 65 + CELSIUS_TO_KELVIN, 'v_g': 0.9}, 30, 'Moderate Loading', 'h')
+    weekly_intensive_use = StrsSpec({'temp': 88 + CELSIUS_TO_KELVIN, 'v_g': 0.92}, 16, 'Heavy Loading', 'h')
+    weekly_idle_use = StrsSpec({'temp': 30 + CELSIUS_TO_KELVIN, 'v_g': 0.87}, 122, 'Idle State', 'h')
 
     check_for_fails = MeasSpec(
-        {'tddb': NUM_SAMPLES}, {'temp': 35 + CELSIUS_TO_KELVIN, 'v_g': 0.9}, print_action=True, name='FailCheck')
+        {'tddb': NUM_SAMPLES}, {'temp': 35 + CELSIUS_TO_KELVIN, 'v_g': 0.9}, name='FailCheck')
 
     field_use_sim = TestSpec([check_for_fails], name='Field Use Sim', description='Test spec designed to represent a \
         real-world use scenario for a consumer device with downtime and higher stress periods.')
     field_use_sim.append_steps(
-        [weekly_moderate_use, weekly_intensive_use, weekly_idle_use, check_for_fails], loop_for_duration=TEST_LEN)
+        [weekly_moderate_use, weekly_intensive_use, weekly_idle_use, check_for_fails], TEST_LEN, 'h')
 
     ########################################################################
     ### 4. Simulate the test                                             ###

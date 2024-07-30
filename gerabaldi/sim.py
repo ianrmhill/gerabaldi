@@ -11,7 +11,7 @@ from copy import deepcopy
 
 from gerabaldi.models import *
 from gerabaldi.exceptions import MissingParamError, UserConfigError
-from gerabaldi.helpers import logger
+from gerabaldi.helpers import logger, _convert_time
 
 __all__ = ['simulate', 'gen_init_state']
 
@@ -95,8 +95,7 @@ def _sim_stress_step(step: StrsSpec, sim_state: SimState, dev_mdl: DeviceMdl,
             sim_state.init_deg_mech_vals[prm], sim_state.latent_var_vals[prm])
         # Now add on the time for the current stress phase
         for mech in equiv_times:
-            equiv_times[mech] += step.duration.total_seconds() / SECONDS_PER_HOUR
-
+            equiv_times[mech] += _convert_time(step.duration, dev_mdl.prm_mdl(prm).mech_mdl(mech).time_unit)
         # 3. Simulate the degradation for each device after adding the equivalent prior stress time
         sim_state.curr_prm_vals[prm], sim_state.curr_deg_mech_vals[prm] = dev_mdl.prm_mdl(prm).calc_deg_vals(
             (report.num_lots, report.num_chps, report.dev_counts[prm]),

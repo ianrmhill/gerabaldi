@@ -20,7 +20,6 @@ ticker = _on_demand_import('matplotlib.ticker', 'matplotlib')
 sb = _on_demand_import('seaborn')
 
 DATA_FILE_NAME = 'erosion_report'
-SECONDS_PER_HOUR = 3600
 HOURS_PER_YEAR = 8760
 
 SAMPLES_PER_RIVER = 10
@@ -40,13 +39,14 @@ def run_simulation(save_file: str = None):
     # We will measure/sample 10 individual locations in the river for each measurement
     erosion_meas = MeasSpec({'riverbed_level': SAMPLES_PER_RIVER}, {'tau': 3}, 'Bed Height Sampling')
     # Each stress phase lasts a quarter of a year
-    summer_strs = StrsSpec({'tau': 4}, HOURS_PER_YEAR / 4, 'Summer Season Flow')
-    autumn_strs = StrsSpec({'tau': 2}, HOURS_PER_YEAR / 4, 'Autumn Season Flow')
-    winter_strs = StrsSpec({'tau': 2}, HOURS_PER_YEAR / 4, 'Winter Season Flow')
-    spring_strs = StrsSpec({'tau': 7}, HOURS_PER_YEAR / 4, 'Spring Season Flow')
+    summer_strs = StrsSpec({'tau': 4}, HOURS_PER_YEAR / 4, 'Summer Season Flow', 'h')
+    autumn_strs = StrsSpec({'tau': 2}, HOURS_PER_YEAR / 4, 'Autumn Season Flow', 'h')
+    winter_strs = StrsSpec({'tau': 2}, HOURS_PER_YEAR / 4, 'Winter Season Flow', 'h')
+    spring_strs = StrsSpec({'tau': 7}, HOURS_PER_YEAR / 4, 'Spring Season Flow', 'h')
     # We will monitor 5 different rivers for 10 years
     ten_year_test = TestSpec([erosion_meas], RIVERS_SAMPLED, 1, name='Riverbed Erosion Process')
-    ten_year_test.append_steps([spring_strs, summer_strs, autumn_strs, winter_strs, erosion_meas], HOURS_PER_YEAR * 10)
+    ten_year_test.append_steps([spring_strs, summer_strs, autumn_strs, winter_strs, erosion_meas],
+                               10 * HOURS_PER_YEAR, 'h')
 
     ########################################################################
     ### 2. Define the test/field environment                             ###
@@ -73,6 +73,7 @@ def run_simulation(save_file: str = None):
 
     river_mdl = DeviceMdl(DegPrmMdl(
         prm_name='riverbed_level',
+        time_unit='hours',
         deg_mech_mdls={
             'erosion': DegMechMdl(
                 fluvial_erosion_riverbed,
@@ -97,15 +98,14 @@ def run_simulation(save_file: str = None):
 
 
 def visualize(report):
+    report.convert_report_time('hours')
     measured = report.measurements
+    measured['time'] = measured['time'] / HOURS_PER_YEAR
 
     # Reformat dataframe to get ready for plotting
     measured = measured.set_index(['param', 'device #', 'chip #'])
     measured = measured.sort_index()
     measured = measured.drop('lot #', axis=1)
-    # Change time deltas to hours then years for processing
-    measured['time'] = measured['time'].apply(lambda time, **kwargs: time.total_seconds() / SECONDS_PER_HOUR, axis=1)
-    measured['time'] = measured['time'] / HOURS_PER_YEAR
 
     # Set up the plots
     sb.set_theme(style='whitegrid', font='Times New Roman')
