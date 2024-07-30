@@ -1,4 +1,4 @@
-# Copyright (c) 2023 Ian Hill
+# Copyright (c) 2024 Ian Hill
 # SPDX-License-Identifier: Apache-2.0
 
 """Classes for defining physical noise sources and measurement capabilities in a test environment."""
@@ -8,6 +8,7 @@ from __future__ import annotations
 from math import floor, log10
 import numpy as np
 import pandas as pd
+
 # For some reason using pd.Series doesn't play well with type annotations
 from pandas import Series
 
@@ -35,8 +36,7 @@ class MeasInstrument:
         The name of the measurement instrument, usually the param it measures (default is 'generic')
     """
 
-    def __init__(self, name: str = 'generic', precision: int = None, error: RandomVar = None,
-                 meas_lims: tuple = None):
+    def __init__(self, name: str = 'generic', precision: int = None, error: RandomVar = None, meas_lims: tuple = None):
         """
         Parameters
         ----------
@@ -54,7 +54,7 @@ class MeasInstrument:
         self._error = error
         self._range = meas_lims
 
-    def measure(self, true_vals: Series | int | float | np.ndarray):
+    def measure(self, true_vals: Series | float | np.ndarray):
         """
         Takes in exact parameter values and simulates the process of measuring them, returning the 'measured' values.
 
@@ -84,7 +84,8 @@ class MeasInstrument:
             # The calculation for determining the sig figs -> decimal places is pretty standard and widely explained
             # Ternary operator is used to handle special cases that cause the rounding to fail otherwise
             meas_vals = meas_vals.apply(
-                lambda x: x if x == 0 or np.isinf(x) else np.round(x, self._precision - int(floor(log10(abs(x)))) - 1))
+                lambda x: x if x == 0 or np.isinf(x) else np.round(x, self._precision - int(floor(log10(abs(x)))) - 1),
+            )
         if self._range:
             # If the measured value exceeds the measurement range then force it to the limit
             meas_vals = meas_vals.clip(lower=self._range[0], upper=self._range[1])
@@ -92,7 +93,7 @@ class MeasInstrument:
         # Convert the measured values back into the passed data type
         if rtrn_type == np.ndarray:
             meas_vals = np.array(meas_vals)
-        elif rtrn_type == int or rtrn_type == float:
+        elif rtrn_type is int or rtrn_type is float:
             meas_vals = meas_vals[0]
         return meas_vals
 
@@ -115,17 +116,34 @@ class EnvVrtnMdl:
     vrtn_type: str
         How the distributions at different stochastic layers are combined to produce a final value, sum or product
     """
+
     # Don't let users add new attributes to the class, helps protect from typos causing bugs
-    __slots__ = ['name', 'vrtn_type', '_unitary', '_op',
-                 'batch_vrtn_mdl', '_batch_vrtns', 'chp_vrtn_mdl', '_chp_vrtns', 'dev_vrtn_mdl', '_dev_vrtns']
+    __slots__ = [
+        'name',
+        'vrtn_type',
+        '_unitary',
+        '_op',
+        'batch_vrtn_mdl',
+        '_batch_vrtns',
+        'chp_vrtn_mdl',
+        '_chp_vrtns',
+        'dev_vrtn_mdl',
+        '_dev_vrtns',
+    ]
     name: str
     vrtn_type: str
     batch_vrtn_mdl: RandomVar
     chp_vrtn_mdl: RandomVar
     dev_vrtn_mdl: RandomVar
 
-    def __init__(self, dev_vrtn_mdl: RandomVar = None, chp_vrtn_mdl: RandomVar = None, batch_vrtn_mdl: RandomVar = None,
-                 vrtn_type: str = 'offset', name: str = None):
+    def __init__(
+        self,
+        dev_vrtn_mdl: RandomVar = None,
+        chp_vrtn_mdl: RandomVar = None,
+        batch_vrtn_mdl: RandomVar = None,
+        vrtn_type: str = 'offset',
+        name: str = None,
+    ):
         """
         Parameters
         ----------
@@ -167,27 +185,27 @@ class EnvVrtnMdl:
                 self._unitary = 0 if value == 'offset' else 1
                 # Each variation model that is not user defined is reset to ensure the new unitary value is used
                 if not self._batch_vrtns:
-                    self.batch_vrtn_mdl = None # noqa: PyTypeChecker
+                    self.batch_vrtn_mdl = None
                 if not self._chp_vrtns:
-                    self.chp_vrtn_mdl = None # noqa: PyTypeChecker
+                    self.chp_vrtn_mdl = None
                 if not self._dev_vrtns:
-                    self.dev_vrtn_mdl = None # noqa: PyTypeChecker
+                    self.dev_vrtn_mdl = None
         # If changing a distribution we need to update its 'is defined' flag and set to generate the unitary if removed
         elif name == 'batch_vrtn_mdl':
-            self._batch_vrtns = False if value is None else True
+            self._batch_vrtns = value is not None
             if not self._batch_vrtns:
                 value = Deterministic(self._unitary)
         elif name == 'chp_vrtn_mdl':
-            self._chp_vrtns = False if value is None else True
+            self._chp_vrtns = value is not None
             if not self._chp_vrtns:
                 value = Deterministic(self._unitary)
         elif name == 'dev_vrtn_mdl':
-            self._dev_vrtns = False if value is None else True
+            self._dev_vrtns = value is not None
             if not self._dev_vrtns:
                 value = Deterministic(self._unitary)
-        super(EnvVrtnMdl, self).__setattr__(name, value)
+        super().__setattr__(name, value)
 
-    def gen_batch_vrtn(self, base_val: int | float) -> np.ndarray:
+    def gen_batch_vrtn(self, base_val: float) -> np.ndarray:
         """
         Generate a stochastic variation value for the environmental condition at the batch stochastic layer
 
@@ -203,7 +221,7 @@ class EnvVrtnMdl:
         """
         return self._op(base_val, self.batch_vrtn_mdl.sample())
 
-    def gen_chp_vrtns(self, base_vals: int | float | np.ndarray, num_chps: int = 1, num_lots: int = 1) -> np.ndarray:
+    def gen_chp_vrtns(self, base_vals: float | np.ndarray, num_chps: int = 1, num_lots: int = 1) -> np.ndarray:
         """
         Generate variational samples of the environmental condition at the between chips stochastic layer. Note that
         this method should be called AFTER any batch-level variations have been generated and applied, thus
@@ -228,7 +246,7 @@ class EnvVrtnMdl:
         # Now include the effect of chip-to-chip variations
         return self._op(vals, self.chp_vrtn_mdl.sample(num_chps * num_lots).reshape((num_lots, num_chps)))
 
-    def gen_dev_vrtns(self, base_vals: int | float | np.ndarray, num_devs: int = 1) -> np.ndarray:
+    def gen_dev_vrtns(self, base_vals: float | np.ndarray, num_devs: int = 1) -> np.ndarray:
         """
         Generate variational samples of the environmental condition at the between device stochastic layer. Note that
         this method should be called AFTER any batch and chip-level variations have been generated and applied, thus
@@ -247,14 +265,19 @@ class EnvVrtnMdl:
             A 3-dimensional array with the varied values for the condition, indexing style is lot->chp->dev
         """
         # Format the base value into a 2D numpy array if not already in that form to represent 1 chip and 1 batch
-        if type(base_vals) != np.ndarray:
+        if type(base_vals) is not np.ndarray:
             base_vals = np.array([[base_vals]])
         # Note that the operation broadcasting here needs to be done carefully, adding the device dimension to base_vals
-        return self._op(np.expand_dims(base_vals, axis=-1), self.dev_vrtn_mdl.sample(num_devs * base_vals.size).
-                        reshape((base_vals.shape[0], base_vals.shape[1], num_devs)))
+        return self._op(
+            np.expand_dims(base_vals, axis=-1),
+            self.dev_vrtn_mdl.sample(num_devs * base_vals.size).reshape(
+                (base_vals.shape[0], base_vals.shape[1], num_devs),
+            ),
+        )
 
-    def gen_env_vrtns(self, base_val: int | float,
-                      num_devs: int = 1, num_chps: int = 1, num_lots: int = 1) -> np.ndarray:
+    def gen_env_vrtns(
+        self, base_val: float, num_devs: int = 1, num_chps: int = 1, num_lots: int = 1,
+    ) -> np.ndarray:
         """
         Generate stochastic samples of the environmental condition for some number of samples, devices, and lots
 
@@ -306,14 +329,14 @@ class PhysTestEnv:
         # Non-mutable default argument setup
         if env_vrtns is None:
             env_vrtns = []
-        elif type(env_vrtns) == dict:
+        elif type(env_vrtns) is dict:
             # If passed as a dictionary, set the object names and transform to list
             for prm in env_vrtns:
                 env_vrtns[prm].name = prm
             env_vrtns = [env_vrtns[prm] for prm in env_vrtns]
         if meas_instms is None:
             meas_instms = []
-        elif type(meas_instms) == dict:
+        elif type(meas_instms) is dict:
             for prm in meas_instms:
                 meas_instms[prm].name = prm
             meas_instms = [meas_instms[prm] for prm in meas_instms]
@@ -356,9 +379,16 @@ class PhysTestEnv:
         """
         return getattr(self, prm + '_var', EnvVrtnMdl())
 
-    def gen_env_cond_vals(self, base_vals: dict, prms: list | dict, test_info: SimReport = None,
-                          dev_mdl: DeviceMdl = None, target: str = 'stress',
-                          num_chps: int = 1, num_lots: int = 1) -> dict:
+    def gen_env_cond_vals(
+        self,
+        base_vals: dict,
+        prms: list | dict,
+        test_info: SimReport = None,
+        dev_mdl: DeviceMdl = None,
+        target: str = 'stress',
+        num_chps: int = 1,
+        num_lots: int = 1,
+    ) -> dict:
         """
         Generate/sample stochastic values for environmental conditions/parameters
 
@@ -395,14 +425,16 @@ class PhysTestEnv:
 
         # If prms is a dictionary the values will be the number of devices to measure, otherwise we use the test info
         # dev counts as the reference for how many devices to generate condition values for
-        if type(prms) == dict:
+        if type(prms) is dict:
             prm_list = list(prms.keys())
             dev_counts = prms
         else:
             prm_list = prms
             if not test_info:
-                raise UserConfigError('Generating environmental condition values requires device counts to be specified'
-                                      'either via the test report or through the "prms" argument.')
+                raise UserConfigError(
+                    'Generating environmental condition values requires device counts to be specified'
+                    'either via the test report or through the "prms" argument.',
+                )
             dev_counts = test_info.dev_counts
 
         # Now generate the device variations for each necessary condition for each parameter

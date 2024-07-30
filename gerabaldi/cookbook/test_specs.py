@@ -1,4 +1,4 @@
-# Copyright (c) 2023 Ian Hill
+# Copyright (c) 2024 Ian Hill
 # SPDX-License-Identifier: Apache-2.0
 
 from __future__ import annotations
@@ -13,9 +13,16 @@ __all__ = ['htol']
 CELSIUS_TO_KELVIN = 273.15
 
 
-def htol(to_meas: dict[str, int], vdd_nom: float = 1.0, vdd_strs_mult: float = 1.2, strs_meas_intrvl: int = 1000,
-         duration_override: int = 1000, num_chps_override: int = 77, num_lots_override: int = 3,
-         temp_override: int = 125) -> TestSpec:
+def htol(
+    to_meas: dict[str, int],
+    vdd_nom: float = 1.0,
+    vdd_strs_mult: float = 1.2,
+    strs_meas_intrvl: int = 1000,
+    duration_override: int = 1000,
+    num_chps_override: int = 77,
+    num_lots_override: int = 3,
+    temp_override: int = 125,
+) -> TestSpec:
     """
     Build an HTOL test in a single function call for use in Gerabaldi simulations
 
@@ -50,19 +57,27 @@ def htol(to_meas: dict[str, int], vdd_nom: float = 1.0, vdd_strs_mult: float = 1
 
     meas_strs = MeasSpec(to_meas, {'temp': strs_temp_c + CELSIUS_TO_KELVIN, 'vdd': strs_vdd}, 'Stress Temp Measurement')
     meas_room = MeasSpec(to_meas, {'temp': room_temp_c + CELSIUS_TO_KELVIN, 'vdd': room_vdd}, 'Room Temp Measurement')
-    htol_strs = StrsSpec({'temp': strs_temp_c + CELSIUS_TO_KELVIN, 'vdd': strs_vdd},
-                         timedelta(hours=htol_duration), 'HTOL Stress')
-    htol_test = TestSpec([meas_room], htol_num_chips, htol_num_lots, name='Standard HTOL',
-                         description='A typical HTOL test with configurable measurements during stress.')
+    htol_strs = StrsSpec(
+        {'temp': strs_temp_c + CELSIUS_TO_KELVIN, 'vdd': strs_vdd}, timedelta(hours=htol_duration), 'HTOL Stress',
+    )
+    htol_test = TestSpec(
+        [meas_room],
+        htol_num_chips,
+        htol_num_lots,
+        name='Standard HTOL',
+        description='A typical HTOL test with configurable measurements during stress.',
+    )
 
     # Include the option to take periodic measurements at the elevated stress conditions during the test
     if strs_meas_intrvl >= htol_duration:
         htol_test.append_steps(htol_strs)
     else:
         if htol_duration % strs_meas_intrvl != 0:
-            raise UserConfigError(f"The stress measure interval of {strs_meas_intrvl} does not fit into {htol_duration}"
-                                  "hours a whole number of times. Please use an interval that is a factor of the test"
-                                  "duration.")
+            raise UserConfigError(
+                f'The stress measure interval of {strs_meas_intrvl} does not fit into {htol_duration}'
+                'hours a whole number of times. Please use an interval that is a factor of the test'
+                'duration.',
+            )
         htol_strs.duration = timedelta(hours=strs_meas_intrvl)
         htol_test.append_steps(meas_strs)
         htol_test.append_steps([htol_strs, meas_strs], loop_for_duration=htol_duration)

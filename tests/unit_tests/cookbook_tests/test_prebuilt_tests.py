@@ -1,7 +1,7 @@
-# Copyright (c) 2023 Ian Hill
+# Copyright (c) 2024 Ian Hill
 # SPDX-License-Identifier: Apache-2.0
 
-import pytest # noqa: PackageNotInRequirements
+import pytest
 from gerabaldi.cookbook.test_specs import htol
 from gerabaldi.exceptions import UserConfigError
 

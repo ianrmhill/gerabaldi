@@ -1,9 +1,9 @@
-# Copyright (c) 2023 Ian Hill
+# Copyright (c) 2024 Ian Hill
 # SPDX-License-Identifier: Apache-2.0
 
 """Tests for the classes that provide the effects of the physical test environment and measuring devices used"""
 
-import pytest # noqa: PackageNotInRequirements
+import pytest
 import numpy as np
 import pandas as pd
 
@@ -51,13 +51,14 @@ def test_env_vrtn_model(sequential_var):
     assert np.round(mdl.chp_vrtn_mdl.sample(), 2) == -0.31
     assert np.allclose(np.round(mdl.gen_env_vrtns(15, 2, 2), 2), np.array([[[14.34, 14.34], [14.72, 14.72]]]))
     mdl.chp_vrtn_mdl = None
-    assert mdl.chp_vrtn_mdl.sample() == 0 # noqa
+    assert mdl.chp_vrtn_mdl.sample() == 0
     with pytest.raises(AttributeError):
-        mdl.new_attribute = 'some_val' # noqa
+        mdl.new_attribute = 'some_val'
 
     # Test all the variation value generation methods
-    mdl = EnvVrtnMdl(dev_vrtn_mdl=sequential_var(0, 0.01), chp_vrtn_mdl=sequential_var(0, 0.1),
-                     batch_vrtn_mdl=sequential_var(1, 1))
+    mdl = EnvVrtnMdl(
+        dev_vrtn_mdl=sequential_var(0, 0.01), chp_vrtn_mdl=sequential_var(0, 0.1), batch_vrtn_mdl=sequential_var(1, 1),
+    )
     mdl.vrtn_type = 'scaling'
     mdl.dev_vrtn_mdl = Deterministic(3)
     mdl.chp_vrtn_mdl = Deterministic(2)
@@ -79,20 +80,28 @@ def test_physical_test_environment(sequential_var):
     # Test default creation first
     env = PhysTestEnv()
     assert env.name == 'unspecified'
-    assert type(env.vrtn_mdl('some_prm')) == EnvVrtnMdl
-    assert type(env.meas_instm('another_prm')) == MeasInstrument
+    assert type(env.vrtn_mdl('some_prm')) is EnvVrtnMdl
+    assert type(env.meas_instm('another_prm')) is MeasInstrument
     assert env.gen_env_cond_vals({'p1': 125, 'prm2': 3.1415}, {'p1': 1, 'prm2': 1})['prm2']['prm2'] == 3.1415
-    assert np.allclose(env.gen_env_cond_vals({'p1': 125}, {'p1': 2}, num_chps=2)['p1']['p1'],
-                       np.array([[[125, 125], [125, 125]]]))
+    assert np.allclose(
+        env.gen_env_cond_vals({'p1': 125}, {'p1': 2}, num_chps=2)['p1']['p1'], np.array([[[125, 125], [125, 125]]]),
+    )
 
     # Now test non-defaults model and instrument use
-    env = PhysTestEnv({'a': EnvVrtnMdl(dev_vrtn_mdl=Normal(0, 2, test_seed=5746)),
-                       'b': EnvVrtnMdl(dev_vrtn_mdl=Gamma(1, 1/3, test_seed=4635))},
-                      {'b': MeasInstrument(precision=2)}, 'Test Env')
+    env = PhysTestEnv(
+        {
+            'a': EnvVrtnMdl(dev_vrtn_mdl=Normal(0, 2, test_seed=5746)),
+            'b': EnvVrtnMdl(dev_vrtn_mdl=Gamma(1, 1 / 3, test_seed=4635)),
+        },
+        {'b': MeasInstrument(precision=2)},
+        'Test Env',
+    )
     assert env.name == 'Test Env'
     assert env.meas_instm('b').measure(4.3674) == 4.4
-    assert np.allclose(np.round(env.vrtn_mdl('b').gen_env_vrtns(-1, 3, 2, 1), 2),
-                       np.array([[[2.62, -0.69, 1.45], [-0.33, 1.84, 0.34]]]))
+    assert np.allclose(
+        np.round(env.vrtn_mdl('b').gen_env_vrtns(-1, 3, 2, 1), 2),
+        np.array([[[2.62, -0.69, 1.45], [-0.33, 1.84, 0.34]]]),
+    )
 
     # Now test the generation of sets of environmental conditions
     assert env.gen_env_cond_vals({'a': 80, 'b': -1}, {'a': 1, 'b': 1})['a']['a'].round(3)[0][0][0] == 83.197
@@ -111,9 +120,12 @@ def test_physical_test_environment(sequential_var):
     def hci_func(time, a, y):
         return (time / a) * y
 
-    dev_mdl = DeviceMdl({
-        'bti': DegPrmMdl(DegMechMdl(bti_func, mdl_name='deg'), cond_shift_mdl=CondShiftMdl(cond_func)),
-        'hci': DegPrmMdl(DegMechMdl(hci_func, mdl_name='deg2'))})
+    dev_mdl = DeviceMdl(
+        {
+            'bti': DegPrmMdl(DegMechMdl(bti_func, mdl_name='deg'), cond_shift_mdl=CondShiftMdl(cond_func)),
+            'hci': DegPrmMdl(DegMechMdl(hci_func, mdl_name='deg2')),
+        },
+    )
     test_spec = TestSpec([MeasSpec({'bti': 2, 'hci': 3, 'b': 2}, {'a': 13, 'b': 7})], num_chps=2, num_lots=1)
     report = SimReport(test_spec)
     env_conds = env.gen_env_cond_vals({'a': 4, 'b': 10}, ['bti', 'hci'], report, dev_mdl)

@@ -1,4 +1,4 @@
-# Copyright (c) 2023 Ian Hill
+# Copyright (c) 2024 Ian Hill
 # SPDX-License-Identifier: Apache-2.0
 
 """
@@ -42,12 +42,12 @@ simulate - The main procedure for the module, uses the above three models to run
 """
 
 # This value determines the project version for PyPi as well
-__version__ = '0.1.3'
+__version__ = '0.1.5'
 
 from . import models
 from . import cookbook
 from .sim import simulate, gen_init_state
 
 __all__ = ['simulate', 'gen_init_state', 'models', 'cookbook']
-__all__.extend(models.__all__)
-__all__.extend(cookbook.__all__)
+__all__ += models.__all__
+__all__ += cookbook.__all__
