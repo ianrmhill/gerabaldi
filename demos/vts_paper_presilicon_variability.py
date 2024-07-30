@@ -47,21 +47,21 @@ def run_simulation(save_files: dict = None):
     full_meas = MeasSpec({'amp_gain': NUM_DEVICES}, {'temp': 30 + CELSIUS_TO_KELVIN, 'vdd': 0.86}, 'Measure All')
 
     # First is a standard HTOL test
-    htol_stress = StrsSpec({'temp': 125 + CELSIUS_TO_KELVIN, 'vdd': 0.92}, 50, 'HTOL Stress')
+    htol_stress = StrsSpec({'temp': 125 + CELSIUS_TO_KELVIN, 'vdd': 0.92}, 50, 'HTOL Stress', 'h')
     htol_test = TestSpec([full_meas], NUM_CHIPS, NUM_LOTS, name='HTOL Similar Test')
-    htol_test.append_steps([htol_stress, full_meas], loop_for_duration=1000)
+    htol_test.append_steps([htol_stress, full_meas], loop_for_duration=1000, time_unit='h')
 
     # Second is a low temperature test
-    ltol_stress = StrsSpec({'temp': -10 + CELSIUS_TO_KELVIN, 'vdd': 0.92}, 50, 'Low Temperature Stress')
+    ltol_stress = StrsSpec({'temp': -10 + CELSIUS_TO_KELVIN, 'vdd': 0.92}, 50, 'Low Temperature Stress', 'h')
     ltol_test = TestSpec([full_meas], NUM_CHIPS, NUM_LOTS, name='LTOL Similar Test')
-    ltol_test.append_steps([ltol_stress, full_meas], loop_for_duration=1000)
+    ltol_test.append_steps([ltol_stress, full_meas], loop_for_duration=1000, time_unit='h')
 
     # Third is a more complex test to showcase the rich test support of the simulator
-    ramp_cycle_relax_interval = StrsSpec({'temp': 30 + CELSIUS_TO_KELVIN, 'vdd': 0.86}, 10, 'Ramp Cycle Relax')
+    ramp_cycle_relax_interval = StrsSpec({'temp': 30 + CELSIUS_TO_KELVIN, 'vdd': 0.86}, 10, 'Ramp Cycle Relax', 'h')
     ramp_failure_test = TestSpec([full_meas], NUM_CHIPS, NUM_LOTS, name='Ramp to Failure Test')
     for i in range(10):
-        cycle_stress = StrsSpec(
-            {'temp': 100 + (10 * i) + CELSIUS_TO_KELVIN, 'vdd': 0.88 + (0.02 * i)}, 90, f"Ramp Cycle Stress {i + 1}")
+        temp, vdd = 100 + (10 * i) + CELSIUS_TO_KELVIN, 0.88 + (0.02 * i)
+        cycle_stress = StrsSpec({'temp': temp, 'vdd': vdd}, 90, f"Ramp Cycle Stress {i + 1}", 'h')
         ramp_failure_test.append_steps([cycle_stress, full_meas, ramp_cycle_relax_interval, full_meas])
 
     ########################################################################
@@ -125,7 +125,8 @@ def run_simulation(save_files: dict = None):
         w=LatentVar(deter_val=8),
         l=LatentVar(deter_val=2),
         v_e=LatentVar(deter_val=5)
-    )})
+    )},
+    time_unit='hours')
 
     ########################################################################
     ### 4. Simulate the tests                                            ###

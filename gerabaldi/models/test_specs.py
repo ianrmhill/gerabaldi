@@ -8,7 +8,7 @@ from __future__ import annotations
 from datetime import timedelta
 
 from gerabaldi.exceptions import UserConfigError
-from gerabaldi.helpers import _time_transformer, _check_time_unit
+from gerabaldi.helpers import logger, _convert_time
 
 __all__ = ['MeasSpec', 'StrsSpec', 'TestSpec']
 
@@ -56,7 +56,7 @@ class StrsSpec:
         Optional descriptive name for the stress specification
     """
     def __init__(self, conditions: dict, duration: timedelta | int | float, name: str = 'unspecified',
-                 time_unit: str = 'hours'):
+                 time_unit: str = None):
         """
         Parameters
         ----------
@@ -71,9 +71,10 @@ class StrsSpec:
         """
         self.conditions = conditions
         # Currently, test lengths use units of hours, but are provided as timedelta objects
-        _check_time_unit(time_unit)
         if type(duration) is not timedelta:
-            duration = _time_transformer(duration, time_unit)
+            if time_unit is None:
+                logger.warn('Stress spec time units not explicitly provided, defaulting to hours.')
+            duration = _convert_time(duration, time_unit)
         # Ensure the duration of the stress phase/cell is not 0
         if duration == timedelta():
             raise UserConfigError(f"Stress Specification '{name}' cannot have a time duration of 0.")
@@ -131,7 +132,7 @@ class TestSpec:
         self.name = name
 
     def append_steps(self, steps: MeasSpec | StrsSpec | list, loop_for_duration: timedelta | int | float = None,
-                     time_unit: str = 'hours'):
+                     time_unit: str = None):
         """
         Append one or more test instruction steps to the end of the existing list of test steps
 
@@ -155,8 +156,9 @@ class TestSpec:
             if type(loop_for_duration) is timedelta:
                 duration = loop_for_duration
             else:
-                _check_time_unit(time_unit)
-                duration = _time_transformer(loop_for_duration, time_unit)
+                if time_unit is None:
+                    logger.warn('Append loop time units not explicitly provided, defaulting to hours.')
+                duration = _convert_time(loop_for_duration, time_unit)
 
             # Ensure duration is not 0
             t = timedelta()
@@ -184,7 +186,7 @@ class TestSpec:
 
             # Check if the duration was an integer multiple of the duration of the set of steps, warn if not
             if not (t / duration).is_integer():
-                raise UserWarning('Appended steps did not result in an integer multiple of the duration, test '
+                raise UserWarning('Appended steps did not result in an integer multiple of the loop duration, test '
                                   'may be longer than intended.')
 
     def calc_samples_needed(self):

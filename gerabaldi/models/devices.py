@@ -13,7 +13,7 @@ from typing import Callable
 from gerabaldi.models.random_vars import RandomVar, Deterministic
 from gerabaldi.models.states import SimState
 from gerabaldi.exceptions import InvalidTypeError, UserConfigError
-from gerabaldi.helpers import logger, _on_demand_import, _loop_compute, _check_time_unit
+from gerabaldi.helpers import logger, _on_demand_import, _loop_compute
 
 # Optional imports are loaded using a helper function that suppresses import errors until attempted use
 pymc = _on_demand_import('pymc')
@@ -343,7 +343,6 @@ class MechMdl(LatentMdl):
             def no_wear_out(): return unitary_val
             mech_eqn = no_wear_out
         self.unitary = unitary_val
-        _check_time_unit(time_unit)
         self.time_unit = time_unit
         super().__init__(mech_eqn, mdl_name, **latent_vars)
 
@@ -767,7 +766,6 @@ class DegPrmMdl(LatentMdl):
         **latent_vars: dict of LatentVar, optional
             Any latent variables used within the degraded parameter's compute equation
         """
-        _check_time_unit(time_unit)
         self.time_unit = time_unit
         self.init_mdl = init_val_mdl if init_val_mdl else InitValMdl(init_val=LatentVar(deter_val=0))
         self.cond_mdl = cond_shift_mdl if cond_shift_mdl else CondShiftMdl()
@@ -1162,7 +1160,6 @@ class DeviceMdl:
         time_unit: str, optional
             The time unit of the device model
         """
-        _check_time_unit(time_unit)
         self.time_unit = time_unit
 
         self.name = name
@@ -1182,7 +1179,7 @@ class DeviceMdl:
 
     def propagate_time_unit(self) -> None:
         for prm in self.prm_mdl_list:
-            if (isinstance(self.prm_mdl(prm), DegPrmMdl)):
+            if isinstance(self.prm_mdl(prm), DegPrmMdl):
                 degPrmMdl = self.prm_mdl(prm)
                 degPrmMdl.propagate_time_unit(self.time_unit)
 

@@ -13,11 +13,6 @@ import pandas as pd
 from datetime import timedelta
 
 from gerabaldi.exceptions import UserConfigError
-HOURS_PER_YEAR = 8760
-SECONDS_PER_HOUR = 3600
-SECONDS_PER_DAY = 3600 * 24
-SECONDS_PER_YEAR = 3600 * 24 * 365
-SECONDS_PER_MILLISECOND = 1/1000
 
 ### Instantiate default logger upon import of this file so that it is always configured ###
 # Instantiate the logger with default settings
@@ -93,20 +88,29 @@ def configure_logger(logging_level: int = None,
         logger.addHandler(file_handler)
 
 
+TIME_UNIT_MAP = {'days': 'days', 'd': 'days', 'hours': 'hours', 'h': 'hours', None: 'hours', 'seconds': 'seconds',
+                 's': 'seconds', 'milliseconds': 'milliseconds', 'ms': 'milliseconds', 'microseconds': 'microseconds',
+                 'us': 'microseconds'}
+TIME_SECOND_FACTORS = {'days': 86400, 'hours': 3600, 'seconds': 1, 'milliseconds': 0.001, 'microseconds': 0.000001}
+
 def _convert_time(time, units, **kwargs): # noqa: UnusedParameter
-    """Helper function compatible with pandas apply() function for converting between time representations."""
+    """Helper function for converting between time representations."""
+    try:
+        td_unit = TIME_UNIT_MAP[units]
+    except KeyError:
+        raise UserConfigError(f"Invalid time units '{units}' requested, implemented options are days (d), hours (h), "
+                              f"seconds (s), milliseconds (ms), and microseconds (us).")
     if type(time) in [timedelta, pd.Timedelta]:
-        return time.total_seconds() / units
+        return time.total_seconds() / TIME_SECOND_FACTORS[td_unit]
     else:
-        return timedelta(**{units: time})
+        return timedelta(**{td_unit: time})
 
 
 def _on_demand_import(module: str, pypi_name: str = None):
     try:
         mod = importlib.import_module(module)
         return mod
-    #except (ImportError, SystemError):
-    except ImportError:
+    except (ImportError, SystemError):
         # Module name and pypi package name do not always match, we want to tell the user the package to install
         if not pypi_name:
             pypi_name = module
@@ -164,38 +168,3 @@ def _loop_compute(eqn, args_dict: dict, dims: tuple):
                 args = _get_single_index(args_dict, i, j, k)
                 computed[i, j, k] = eqn(**args)
     return computed
-
-
-def _check_time_unit(time_unit: str):
-    """Check if the provided time unit is legal."""
-    if (time_unit not in ['hours', 'seconds', 'milliseconds', 'years', 'h', 's', 'ms', 'y']) and (time_unit is not None):
-        raise UserConfigError("Incorrect time unit. The valid options are "
-                                "'hours' ('h'), 'seconds' ('s'), 'milliseconds' ('ms'), and 'years' ('y').")
-
-
-def _time_transformer(duration: int | float, time_unit: str) -> timedelta:
-    """Transform raw time value to timedelta."""
-    if time_unit in ['hours', 'h']:
-        transformed_time = timedelta(hours=duration)
-    elif time_unit in ['seconds', 's']:
-        transformed_time = timedelta(seconds=duration)
-    elif time_unit in ['milliseconds', 'ms']:
-        transformed_time = timedelta(milliseconds=duration)
-    elif time_unit in ['years', 'y']:
-        transformed_time = timedelta(hours=duration * HOURS_PER_YEAR)
-
-    return transformed_time
-
-
-def _inverse_time_transformer(duration: timedelta, time_unit: str) -> float:
-    """Transform timedelta to raw time value."""
-    if time_unit in ['hours', 'h']:
-        transformed_time = duration.total_seconds() / SECONDS_PER_HOUR
-    elif time_unit in ['seconds', 's']:
-        transformed_time = duration.total_seconds()
-    elif time_unit in ['milliseconds', 'ms']:
-        transformed_time = duration.total_seconds() / SECONDS_PER_MILLISECOND
-    elif time_unit in ['years', 'y']:
-        transformed_time = duration.total_seconds() / SECONDS_PER_YEAR
-
-    return transformed_time

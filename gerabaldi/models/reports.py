@@ -12,14 +12,10 @@ from datetime import timedelta
 from pathlib import Path
 
 from gerabaldi.models.test_specs import TestSpec
-from gerabaldi.exceptions import ArgOverwriteWarning
-from gerabaldi.helpers import _convert_time, _check_time_unit, _inverse_time_transformer, logger
+from gerabaldi.exceptions import UserConfigError
+from gerabaldi.helpers import _convert_time, TIME_UNIT_MAP, logger
 
 __all__ = ['SimReport']
-
-SECONDS_PER_HOUR = 3600
-SECONDS_PER_MILLISECOND = 0.001
-SECONDS_PER_YEAR = 31536000
 
 
 class SimReport:
@@ -57,6 +53,7 @@ class SimReport:
         file: str, optional
             Path and filename (absolute or relative to CWD) to a JSON containing a test report to load
         """
+        self.time_unit = None
         # Standard construction is using a test specification to determine all the basic test information
         if test_spec:
             self.test_name = name if name else test_spec.name
@@ -80,6 +77,7 @@ class SimReport:
             self.test_summary = pd.read_json(report_json['Test Summary'])
             # Convert the times back to time deltas
             units = report_json['Time Units'].lower()
+            self.time_unit = units
             self.measurements['time'] = self.measurements['time'].apply(_convert_time, units=units, axis=1)
             self.test_summary['start time'] = self.test_summary['start time'].apply(_convert_time, units=units,
                                                                                     axis=1)
@@ -158,7 +156,7 @@ class SimReport:
         """
         self.test_summary = pd.concat([self.test_summary, summary_info], ignore_index=True)
 
-    def export_to_json(self, file: str = None, time_unit: str = 'seconds') -> None | dict:
+    def export_to_json(self, file: str = None, time_unit: str = None) -> None | dict:
         """
         Formats a test report as a json string so that it can be saved as a file for storage or sharing
 
@@ -175,31 +173,28 @@ class SimReport:
             No return value if saving to file, otherwise the JSON dictionary format for the report
         """
         report_json = {'Test Name': self.test_name, 'Description': self.test_description}
-        if time_unit in ['hours', 'h']:
-            div_time = SECONDS_PER_HOUR
-            report_json['Time Units'] = 'Hours'
-        elif time_unit in ['seconds', 's']:
-            div_time = 1
-            report_json['Time Units'] = 'Seconds'
-        elif time_unit in ['milliseconds', 'ms']:
-            div_time = SECONDS_PER_MILLISECOND
-            report_json['Time Units'] = 'Milliseconds'
-        elif time_unit in ['years', 'y']:
-            div_time = SECONDS_PER_YEAR
-            report_json['Time Units'] = 'Years'
+        if time_unit is None:
+            if self.time_unit is None:
+                logger.warn('Time units for exported JSON report not explicitly provided, defaulting to hours.')
+                units = 'hours'
+            else:
+                units = self.time_unit
         else:
-            div_time = 1
-            report_json['Time Units'] = 'Seconds'
-            raise ArgOverwriteWarning(f"Could not understand requested time units of {time_unit},"
-                                      "defaulting to seconds.")
+            try:
+                units = TIME_UNIT_MAP[time_unit]
+            except KeyError:
+                raise UserConfigError(
+                    f"Invalid time units '{time_unit}' requested, implemented options are days (d), hours (h), "
+                    f"seconds (s), milliseconds (ms), and microseconds (us).")
+        report_json['Time Units'] = units
 
         meas_cpy = self.measurements.copy()
-        meas_cpy['time'] = meas_cpy['time'].apply(_convert_time, units=div_time, axis=1)
+        meas_cpy['time'] = meas_cpy['time'].apply(_convert_time, units=units, axis=1)
         report_json['Measurements'] = meas_cpy.to_json()
         strs_cpy = self.test_summary.copy()
-        strs_cpy['duration'] = strs_cpy['duration'].apply(_convert_time, units=div_time, axis=1)
-        strs_cpy['start time'] = strs_cpy['start time'].apply(_convert_time, units=div_time, axis=1)
-        strs_cpy['end time'] = strs_cpy['end time'].apply(_convert_time, units=div_time, axis=1)
+        strs_cpy['duration'] = strs_cpy['duration'].apply(_convert_time, units=units, axis=1)
+        strs_cpy['start time'] = strs_cpy['start time'].apply(_convert_time, units=units, axis=1)
+        strs_cpy['end time'] = strs_cpy['end time'].apply(_convert_time, units=units, axis=1)
         report_json['Test Summary'] = strs_cpy.to_json()
 
         if file:
@@ -212,10 +207,13 @@ class SimReport:
         else:
             return report_json
 
-    def convert_report_time(self, time_unit: str = "hours") -> None:
+    def convert_report_time(self, time_unit: str = None) -> None:
         """
         Convert the timedelta in the dataframe to raw values according to the specified time unit.
         """
-        _check_time_unit(time_unit)
-        self.time_unit = time_unit
-        self.measurements['time'] = self.measurements['time'].apply(lambda time: _inverse_time_transformer(time, self.time_unit))
+        units = time_unit
+        if units is None:
+            logger.warn('Converted report time units not explicitly provided, defaulting to hours.')
+            units = 'hours'
+        self.time_unit = units
+        self.measurements['time'] = self.measurements['time'].apply(lambda time: _convert_time(time, self.time_unit))

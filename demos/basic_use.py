@@ -33,7 +33,7 @@ def run_simulation(save_file: str = None):
     ### 1. Define the test to simulate                                   ###
     ########################################################################
     meas_spec = MeasSpec({'example_prm': NUM_DEVICES}, {'temp': 25 + CELSIUS_TO_KELVIN})
-    strs_spec = StrsSpec({'temp': 125 + CELSIUS_TO_KELVIN}, 100)
+    strs_spec = StrsSpec({'temp': 125 + CELSIUS_TO_KELVIN}, 100, time_unit='h')
     test_spec = TestSpec([meas_spec, strs_spec, meas_spec])
 
     ########################################################################
@@ -48,7 +48,7 @@ def run_simulation(save_file: str = None):
         return time * -a * temp
     dev_mdl = DeviceMdl(
         {'example_prm': DegPrmMdl(
-            {'linear': DegMechMdl(ex_eqn, a=LatentVar(Normal(1e-3, 2e-4)))})})
+            {'linear': DegMechMdl(ex_eqn, a=LatentVar(Normal(1e-3, 2e-4)), time_unit='h')})})
 
     ########################################################################
     ### 4. Simulate the test                                             ###
