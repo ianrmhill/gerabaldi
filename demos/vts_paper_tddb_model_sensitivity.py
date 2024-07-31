@@ -69,7 +69,8 @@ if sys.version_info[1] == 8:
     ):
         # We physically model a transistor oxide layer with 12 possible defect locations
         layout = np.array(
-            [defect0, defect1, defect2, defect3, defect4, defect5, defect6, defect7, defect8, defect9, defect10, defect11]
+            [defect0, defect1, defect2, defect3, defect4, defect5,
+             defect6, defect7, defect8, defect9, defect10, defect11]
         ).reshape((3, 4))
         # Determine defects formed based on whether the stochastic defect formation value has hit a threshold
         oxide = pd.DataFrame(layout).applymap(lambda deg: 1 if deg > threshold else 0)
@@ -101,7 +102,8 @@ else:
     ):
         # We physically model a transistor oxide layer with 12 possible defect locations
         layout = np.array(
-            [defect0, defect1, defect2, defect3, defect4, defect5, defect6, defect7, defect8, defect9, defect10, defect11]
+            [defect0, defect1, defect2, defect3, defect4, defect5,
+             defect6, defect7, defect8, defect9, defect10, defect11]
         ).reshape((3, 4))
         # Determine defects formed based on whether the stochastic defect formation value has hit a threshold
         oxide = pd.DataFrame(layout).map(lambda deg: 1 if deg > threshold else 0)
