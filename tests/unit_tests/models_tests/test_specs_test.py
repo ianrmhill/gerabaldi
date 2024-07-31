@@ -1,9 +1,9 @@
-# Copyright (c) 2023 Ian Hill
+# Copyright (c) 2024 Ian Hill
 # SPDX-License-Identifier: Apache-2.0
 
 """Tests that ensure the effective description and execution of test specifications are correctly implemented"""
 
-import pytest # noqa: PackageNotInRequirements
+import pytest
 from datetime import timedelta
 
 from gerabaldi.models import MeasSpec, StrsSpec, TestSpec

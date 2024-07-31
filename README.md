@@ -20,9 +20,9 @@ currently requires Python version 3.10 or greater.
 
 To download the source code, clone this repository and make it available to your Python code through your PYTHONPATH.
 
-There are minimal required dependencies in terms of other Python packages to use the packaged version of Gerabaldi, but
-some optional features will require additional packages which you will be notified to install if attempting to use those
-features.
+There are minimal required dependencies in terms of other Python packages to use most features of Gerabaldi, but
+some optional features require additional packages which you will be notified to install on an as-needed basis.
+
 
 ## Demos
 
@@ -84,4 +84,11 @@ improvements to achieve this goal!
 
 ## Citing Gerabaldi
 If you use the Gerabaldi simulator to aid in your research it would be greatly appreciated if you could cite the
-Gerabaldi 2023 IEEE VLSI Test Symposium paper in any resulting publications.
+Gerabaldi 2023 IEEE VLSI Test Symposium paper in any resulting publications,
+doi: https://doi.org/10.1109/VTS56346.2023.10140111.
+
+
+## Code Style and Formatting
+The Gerabaldi codebase uses Ruff for linting and formatting rules, the linting checks are run whenever a commit is
+pushed to the Github repository. Refer to the Ruff documentation for information on different error codes that may be
+raised: https://docs.astral.sh/ruff

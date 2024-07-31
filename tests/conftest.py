@@ -1,19 +1,20 @@
-# Copyright (c) 2023 Ian Hill
+# Copyright (c) 2024 Ian Hill
 # SPDX-License-Identifier: Apache-2.0
 
 """Helper classes and functions to improve testing of stochastic methods."""
 
 from __future__ import annotations
 
-import pytest # noqa: PackageNotInRequirements
+import pytest
 import numpy as np
 
 from gerabaldi.models.random_vars import RandomVar
 
 
-class Sequential(RandomVar): # noqa: ImplementAbstract
+class Sequential(RandomVar):
     """Non-stochastic generator that always generates a sequence with length equal to the number of samples."""
-    def __init__(self, start: int | float = 0, increment: int | float = 1, **super_opts):
+
+    def __init__(self, start: float = 0, increment: float = 1, **super_opts):
         self.start = start
         self.inc = increment
         # To let a generator be initialized, we need to pass a viable distribution to numpy RNG
@@ -28,6 +29,6 @@ class Sequential(RandomVar): # noqa: ImplementAbstract
         return np.linspace(self.start, self.start + (self.inc * (quantity - 1)), num=quantity)
 
 
-@pytest.fixture
+@pytest.fixture()
 def sequential_var():
     return Sequential

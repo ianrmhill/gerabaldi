@@ -1,16 +1,17 @@
-# Copyright (c) 2023 Ian Hill
+# Copyright (c) 2024 Ian Hill
 # SPDX-License-Identifier: Apache-2.0
 
 import os
 import sys
+
 # Welcome to the worst parts of Python! This line adds the parent directory of this file to module search path, from
 # which the Gerabaldi module can be seen and then imported. Without this line the script cannot find the module without
 # installing it as a package from pip (which is undesirable because you would have to rebuild the package every time
 # you changed part of the code).
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-import gerabaldi # noqa: ImportNotAtTopOfFile
-from gerabaldi.models import * # noqa: ImportNotAtTopOfFile
-from gerabaldi.helpers import _on_demand_import # noqa: ImportNotAtTopOfFile
+import gerabaldi
+from gerabaldi.models import *
+from gerabaldi.helpers import _on_demand_import
 
 click = _on_demand_import('click')
 plt = _on_demand_import('matplotlib.pyplot', 'matplotlib')
@@ -33,7 +34,7 @@ def run_simulation(save_file: str = None):
     ### 1. Define the test to simulate                                   ###
     ########################################################################
     meas_spec = MeasSpec({'example_prm': NUM_DEVICES}, {'temp': 25 + CELSIUS_TO_KELVIN})
-    strs_spec = StrsSpec({'temp': 125 + CELSIUS_TO_KELVIN}, 100)
+    strs_spec = StrsSpec({'temp': 125 + CELSIUS_TO_KELVIN}, 100, time_unit='h')
     test_spec = TestSpec([meas_spec, strs_spec, meas_spec])
 
     ########################################################################
@@ -46,9 +47,10 @@ def run_simulation(save_file: str = None):
     ########################################################################
     def ex_eqn(time, temp, a):
         return time * -a * temp
+
     dev_mdl = DeviceMdl(
-        {'example_prm': DegPrmMdl(
-            {'linear': DegMechMdl(ex_eqn, a=LatentVar(Normal(1e-3, 2e-4)))})})
+        {'example_prm': DegPrmMdl({'linear': DegMechMdl(ex_eqn, a=LatentVar(Normal(1e-3, 2e-4)), time_unit='h')})},
+    )
 
     ########################################################################
     ### 4. Simulate the test                                             ###
@@ -62,9 +64,8 @@ def run_simulation(save_file: str = None):
 
 
 def visualize(report):
+    report.convert_report_time('hours')
     measured = report.measurements
-    # Change time deltas to hours for processing
-    measured['time'] = measured['time'].apply(lambda time, **kwargs: time.total_seconds() / SECONDS_PER_HOUR, axis=1)
 
     # Set up the figure area
     colours = ['mediumpurple', 'green', 'cornflowerblue', 'aqua', 'limegreen']
@@ -92,7 +93,7 @@ def entry(data_file, save_data):
     if data_file is not None:
         report = SimReport(file=data_file)
     else:
-        data_file = os.path.join(os.path.dirname(__file__), f"data/{DATA_FILE_NAME}.json") if save_data else None
+        data_file = os.path.join(os.path.dirname(__file__), f'data/{DATA_FILE_NAME}.json') if save_data else None
         report = run_simulation(save_file=data_file)
     visualize(report)
 

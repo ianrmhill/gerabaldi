@@ -1,4 +1,4 @@
-# Copyright (c) 2023 Ian Hill
+# Copyright (c) 2024 Ian Hill
 # SPDX-License-Identifier: Apache-2.0
 
 """Classes for defining degradation models for tuning or use in simulating wear-out tests"""
@@ -14,7 +14,7 @@ from gerabaldi.math import minimize
 from gerabaldi.models.random_vars import RandomVar, Deterministic
 from gerabaldi.models.states import SimState
 from gerabaldi.exceptions import InvalidTypeError, UserConfigError
-from gerabaldi.helpers import _on_demand_import, _loop_compute
+from gerabaldi.helpers import logger, _on_demand_import, _loop_compute
 
 # Optional imports are loaded using a helper function that suppresses import errors until attempted use
 pymc = _on_demand_import('pymc')
@@ -23,8 +23,16 @@ dist = _on_demand_import('pyro.distributions', 'pyro-ppl')
 tc = _on_demand_import('torch')
 
 
-__all__ = ['LatentVar', 'InitValMdl', 'CondShiftMdl', 'DegMechMdl', 'FailMechMdl',
-           'DegPrmMdl', 'CircPrmMdl', 'DeviceMdl']
+__all__ = [
+    'LatentVar',
+    'InitValMdl',
+    'CondShiftMdl',
+    'DegMechMdl',
+    'FailMechMdl',
+    'DegPrmMdl',
+    'CircPrmMdl',
+    'DeviceMdl',
+]
 
 
 class LatentVar:
@@ -52,17 +60,36 @@ class LatentVar:
     deter_val: float or int
         Deterministic value override to obtain conventional simulation behaviour if no stochastic behaviour is desired
     """
-    __slots__ = ['name', 'vrtn_type', 'deter_val', '_unitary', '_op',
-                 'dev_vrtn_mdl', '_dev_vrtns', 'chp_vrtn_mdl', '_chp_vrtns', 'lot_vrtn_mdl', '_lot_vrtns']
+
+    __slots__ = [
+        'name',
+        'vrtn_type',
+        'deter_val',
+        '_unitary',
+        '_op',
+        'dev_vrtn_mdl',
+        '_dev_vrtns',
+        'chp_vrtn_mdl',
+        '_chp_vrtns',
+        'lot_vrtn_mdl',
+        '_lot_vrtns',
+    ]
     name: str
     vrtn_type: str
     dev_vrtn_mdl: RandomVar
     chp_vrtn_mdl: RandomVar
     lot_vrtn_mdl: RandomVar
-    deter_val: int | float
+    deter_val: float
 
-    def __init__(self, dev_vrtn_mdl: RandomVar = None, chp_vrtn_mdl: RandomVar = None, lot_vrtn_mdl: RandomVar = None,
-                 deter_val: float | int = None, name: str = None, vrtn_type: str = 'scaling'):
+    def __init__(
+        self,
+        dev_vrtn_mdl: RandomVar = None,
+        chp_vrtn_mdl: RandomVar = None,
+        lot_vrtn_mdl: RandomVar = None,
+        deter_val: float = None,
+        name: str = None,
+        vrtn_type: str = 'scaling',
+    ):
         """
         Parameters
         ----------
@@ -89,24 +116,25 @@ class LatentVar:
         self.name = name
         self.vrtn_type = vrtn_type
         if not dev_vrtn_mdl and deter_val is None:
-            raise UserConfigError(f"Latent {self.name} definition must include either a device distribution or"
-                                  "deterministic value argument.")
+            raise UserConfigError(
+                f'Latent {self.name} definition must include either a device distribution or'
+                'deterministic value argument.',
+            )
 
     def __setattr__(self, name, value):
-        if name == 'name':
+        if name == 'name' and value is not None:
             # Need to also update the naming of the probabilistic distributions to have CBI export work correctly
-            if value is not None:
-                if self._dev_vrtns:
-                    # Set the distribution name to be the variable name + '_dev' suffix, unless the device variation
-                    # model fully specifies the variable value, in which case don't add the suffix
-                    if not self._chp_vrtns and not self._lot_vrtns:
-                        self.dev_vrtn_mdl.name = value
-                    else:
-                        self.dev_vrtn_mdl.name = value + '_dev'
-                if self._chp_vrtns:
-                    self.chp_vrtn_mdl.name = value + '_chp'
-                if self._lot_vrtns:
-                    self.lot_vrtn_mdl.name = value + '_lot'
+            if self._dev_vrtns:
+                # Set the distribution name to be the variable name + '_dev' suffix, unless the device variation
+                # model fully specifies the variable value, in which case don't add the suffix
+                if not self._chp_vrtns and not self._lot_vrtns:
+                    self.dev_vrtn_mdl.name = value
+                else:
+                    self.dev_vrtn_mdl.name = value + '_dev'
+            if self._chp_vrtns:
+                self.chp_vrtn_mdl.name = value + '_chp'
+            if self._lot_vrtns:
+                self.lot_vrtn_mdl.name = value + '_lot'
         if name == 'vrtn_type':
             # If changing the variation type we need to also update all the attributes that are used to compute values
             if value not in ['scaling', 'offset']:
@@ -117,25 +145,25 @@ class LatentVar:
                 self._unitary = 0 if value == 'offset' else 1
                 # Each variation model that is not user defined is reset to ensure the new unitary value is used
                 if not self._lot_vrtns:
-                    self.lot_vrtn_mdl = None # noqa: PyTypeChecker
+                    self.lot_vrtn_mdl = None
                 if not self._chp_vrtns:
-                    self.chp_vrtn_mdl = None # noqa: PyTypeChecker
+                    self.chp_vrtn_mdl = None
                 if not self._dev_vrtns:
-                    self.dev_vrtn_mdl = None # noqa: PyTypeChecker
+                    self.dev_vrtn_mdl = None
         # If changing a distribution we need to update its 'is defined' flag and set to generate the unitary if removed
         if name == 'dev_vrtn_mdl':
-            self._dev_vrtns = False if value is None else True
+            self._dev_vrtns = value is not None
             if not self._dev_vrtns:
                 value = Deterministic(self._unitary)
         if name == 'chp_vrtn_mdl':
-            self._chp_vrtns = False if value is None else True
+            self._chp_vrtns = value is not None
             if not self._chp_vrtns:
                 value = Deterministic(self._unitary)
         if name == 'lot_vrtn_mdl':
-            self._lot_vrtns = False if value is None else True
+            self._lot_vrtns = value is not None
             if not self._lot_vrtns:
                 value = Deterministic(self._unitary)
-        super(LatentVar, self).__setattr__(name, value)
+        super().__setattr__(name, value)
 
     def gen_latent_vals(self, num_devs: int = 1, num_chps: int = 1, num_lots: int = 1) -> np.ndarray:
         """
@@ -189,7 +217,7 @@ class LatentVar:
             elif target_framework == 'pyro':
                 op = tc.multiply if self.vrtn_type == 'scaling' else tc.add
             else:
-                raise NotImplementedError(f"Requested target CBI framework {target_framework} is not yet supported.")
+                raise NotImplementedError(f'Requested target CBI framework {target_framework} is not yet supported.')
 
             # If a deterministic value was used we may still be able to convert the variable to a probabilistic form
             old_centre = None
@@ -211,17 +239,11 @@ class LatentVar:
             elif self._chp_vrtns and not self._lot_vrtns:
                 dev = self.dev_vrtn_mdl.get_cbi_form(target_framework=target_framework)
                 chp = self.chp_vrtn_mdl.get_cbi_form(target_framework=target_framework)
-                if target_framework == 'pymc':
-                    cbi_dist = pymc.Deterministic(self.name, op(dev, chp))
-                else:
-                    cbi_dist = op(dev, chp)
+                cbi_dist = pymc.Deterministic(self.name, op(dev, chp)) if target_framework == 'pymc' else op(dev, chp)
             elif not self._chp_vrtns and self._lot_vrtns:
                 dev = self.dev_vrtn_mdl.get_cbi_form(target_framework=target_framework)
                 lot = self.lot_vrtn_mdl.get_cbi_form(target_framework=target_framework)
-                if target_framework == 'pymc':
-                    cbi_dist = pymc.Deterministic(self.name, op(dev, lot))
-                else:
-                    cbi_dist = op(dev, lot)
+                cbi_dist = pymc.Deterministic(self.name, op(dev, lot)) if target_framework == 'pymc' else op(dev, lot)
             else:
                 cbi_dist = self.dev_vrtn_mdl.get_cbi_form(target_framework=target_framework)
             # Return the dev_vrtn_mdl centre value to previous if it was changed to avoid any method side effects
@@ -229,7 +251,7 @@ class LatentVar:
                 self.dev_vrtn_mdl.set_centre(old_centre)
             return cbi_dist
         else:
-            raise Exception(f"Cannot export deterministic latent variable {self.name} for CBI use.")
+            raise UserConfigError(f'Cannot export deterministic latent variable {self.name} for CBI use.')
 
 
 class LatentMdl:
@@ -238,11 +260,15 @@ class LatentMdl:
 
     This class should not be instantiated directly, use an inheriting class.
     """
+
     def __init__(self, mdl_eqn: Callable = None, mdl_name: str = None, **latent_vars: LatentVar):
         self.name = mdl_name
         # Add default to ensure the object attribute can always be called
         if not mdl_eqn:
-            def mdl_eqn(x): return x
+
+            def mdl_eqn(x):
+                return x
+
         self.compute = mdl_eqn
         self.compute_args = inspect.signature(self.compute).parameters.keys()
         # Define 'true'/underlying values for equation inputs used to simulate degradation
@@ -253,7 +279,7 @@ class LatentMdl:
             if latent_vars[var].name == '' or not latent_vars[var].name:
                 latent_vars[var].name = var
             # Indicate the latent variable attributes as private since they're supposed to be uncertain
-            setattr(self, f"_latent_{var}", latent_vars[var])
+            setattr(self, f'_latent_{var}', latent_vars[var])
             self.latent_vars.append(var)
 
     def latent_var(self, var: str):
@@ -270,7 +296,7 @@ class LatentMdl:
         LatentVar
             The Gerabaldi representation of the requested latent variable
         """
-        return getattr(self, f"_latent_{var}")
+        return getattr(self, f'_latent_{var}')
 
     def gen_latent_vals(self, num_devs: int = 1, num_chps: int = 1, num_lots: int = 1) -> dict:
         """
@@ -327,7 +353,7 @@ class LatentMdl:
         # Finally, define the output as a variable as well
         if target_framework == 'pymc':
             return pymc.Normal(name=self.name, mu=computed, sigma=1, observed=observed[self.name])
-        elif target_framework == 'pyro':
+        else:
             return pyro.sample(self.name, dist.Normal(computed, 0.1), obs=observed[self.name]).to_event(1)
 
 
@@ -337,12 +363,23 @@ class MechMdl(LatentMdl):
 
     This class should not be instantiated directly, use an inheriting class.
     """
-    def __init__(self, mech_eqn: Callable = None, mdl_name: str = None, unitary_val: int = 0, **latent_vars: LatentVar):
+
+    def __init__(
+        self,
+        mech_eqn: Callable = None,
+        mdl_name: str = None,
+        unitary_val: int = 0,
+        time_unit: str = None,
+        **latent_vars: LatentVar,
+    ):
         if not mech_eqn:
             # Default is a non-degrading model, parameter stays the same (i.e. 'fresh') regardless of stress and time
-            def no_wear_out(): return unitary_val
+            def no_wear_out():
+                return unitary_val
+
             mech_eqn = no_wear_out
         self.unitary = unitary_val
+        self.time_unit = time_unit
         super().__init__(mech_eqn, mdl_name, **latent_vars)
 
     def gen_init_vals(self, num_devs, num_chps, num_lots):
@@ -370,8 +407,17 @@ class MechMdl(LatentMdl):
     def calc_equiv_strs_time(self, deg_val, init_val, strs_conds, latents, dims):
         raise NotImplementedError('Mechanism does not define how to compute value changes under time-varying stress')
 
-    def calc_deg_vals(self, times: np.ndarray, pre_deg_vals: np.ndarray,
-                      strs_conds: dict, latents: dict, dims: tuple) -> np.ndarray:
+    def set_time_unit(self, prm_time_unit: str = None) -> None:
+        if self.time_unit is None:
+            if prm_time_unit is None:
+                self.time_unit = 'h'
+                logger.warning(f'No explicit time units for mechanism model {self.name}, defaulting to hours.')
+            else:
+                self.time_unit = prm_time_unit
+
+    def calc_deg_vals(
+        self, times: np.ndarray, pre_deg_vals: np.ndarray, strs_conds: dict, latents: dict, dims: tuple,
+    ) -> np.ndarray:
         """
         Calculate the underlying degraded values for the parameter given a set of stress conditions and stress duration.
         Note that this method does not calculate a measured value, only the 'true' underlying degraded parameter value.
@@ -435,7 +481,15 @@ class DegMechMdl(MechMdl):
     unitary: int or float
         The value for the mechanism output that results in no effect to the parent parameter's output value
     """
-    def __init__(self, mech_eqn: Callable = None, mdl_name: str = None, unitary_val: int = 0, **latent_vars: LatentVar):
+
+    def __init__(
+        self,
+        mech_eqn: Callable = None,
+        mdl_name: str = None,
+        unitary_val: int = 0,
+        time_unit: str = None,
+        **latent_vars: LatentVar,
+    ):
         """
         Parameters
         ----------
@@ -445,17 +499,21 @@ class DegMechMdl(MechMdl):
             Descriptive name for the mechanism model
         unitary_val: int
             The value for the mechanism output that results in no effect to the parent parameter's value (default 0)
+        time_unit: str, optional
+            The time unit of the mechanism model
         **latent_vars: dict of LatentVar, optional
             Latent variable models used as part of the mechanism's compute equation
         """
-        super().__init__(mech_eqn, mdl_name, unitary_val, **latent_vars)
+        super().__init__(mech_eqn, mdl_name, unitary_val, time_unit, **latent_vars)
 
-    def calc_equiv_strs_time(self, deg_val: int | float, init_val: int | float,
-                             strs_conds: dict, latents: dict, dims: tuple) -> float:
+    def calc_equiv_strs_time(
+        self, deg_val: float, init_val: float, strs_conds: dict, latents: dict, dims: tuple,
+    ) -> float:
         """
         This method back-calculates the length of time required to reach the current level of degradation under a given
-        set of stress conditions for all the different samples in the test. See the Gerabaldi VTS 2023 paper or
-        documentation for an explanation of the conceptual idea and procedure used to calculate these values.
+        set of stress conditions for all the different samples in the test. See the Gerabaldi VTS 2023 paper
+        (https://doi.org/10.1109/VTS56346.2023.10140111) or documentation for an explanation of the conceptual idea and
+        procedure used to calculate these values.
 
         Parameters
         ----------
@@ -475,6 +533,7 @@ class DegMechMdl(MechMdl):
         float
             The amount of time required to reach the current value of degradation under the specified stress conditions
         """
+
         # Computes the absolute difference between the target value and the calculated value using a given time
         def residue(time, curr_deg_val, conds, ltnts):
             arg_vals = {'time': time}
@@ -509,7 +568,15 @@ class FailMechMdl(MechMdl):
     unitary: int or float
         The value for the mechanism output that results in no effect to the parent parameter's output value
     """
-    def __init__(self, mech_eqn: Callable = None, mdl_name: str = None, unitary_val: int = 0, **latent_vars: LatentVar):
+
+    def __init__(
+        self,
+        mech_eqn: Callable = None,
+        mdl_name: str = None,
+        unitary_val: int = 0,
+        time_unit: str = None,
+        **latent_vars: LatentVar,
+    ):
         """
         Parameters
         ----------
@@ -519,13 +586,16 @@ class FailMechMdl(MechMdl):
             Descriptive name for the mechanism model
         unitary_val: int
             The value for the mechanism output that results in no effect to the parent parameter's value (default 0)
+        time_unit: str, optional
+            The time unit of the mechanism model
         **latent_vars: dict of LatentVar, optional
             Latent variable models used as part of the mechanism's compute equation
         """
-        super().__init__(mech_eqn, mdl_name, unitary_val, **latent_vars)
+        super().__init__(mech_eqn, mdl_name, unitary_val, time_unit, **latent_vars)
 
-    def calc_equiv_strs_time(self, deg_val: int | float, init_val: int | float,
-                             strs_conds: dict, latents: dict, dims: tuple) -> float:
+    def calc_equiv_strs_time(
+        self, deg_val: float, init_val: float, strs_conds: dict, latents: dict, dims: tuple,
+) -> float:
         """
         This method matches the signature of the DegMechMdl implementation but always returns zero. This is because a
         hard-failure mechanism has no degradation component, only instantaneous failures, thus the concept of an
@@ -552,8 +622,9 @@ class FailMechMdl(MechMdl):
         """
         return 0.0
 
-    def calc_deg_vals(self, times: np.ndarray, pre_deg_vals: np.ndarray,
-                      strs_conds: dict, latents: dict, dims: tuple) -> np.ndarray:
+    def calc_deg_vals(
+        self, times: np.ndarray, pre_deg_vals: np.ndarray, strs_conds: dict, latents: dict, dims: tuple,
+    ) -> np.ndarray:
         """
         Calculate the failure state for the mechanism given a set of stress conditions and stress duration
 
@@ -576,8 +647,11 @@ class FailMechMdl(MechMdl):
             Post-stress failure states for each sample of the mechanism
         """
         # Once the state has failed (i.e., unitary is the initial/unfailed state) the mechanism remains failed
-        return np.where(pre_deg_vals != self.unitary, pre_deg_vals,
-                        super().calc_deg_vals(times, pre_deg_vals, strs_conds, latents, dims))
+        return np.where(
+            pre_deg_vals != self.unitary,
+            pre_deg_vals,
+            super().calc_deg_vals(times, pre_deg_vals, strs_conds, latents, dims),
+        )
 
 
 class CondShiftMdl(LatentMdl):
@@ -597,8 +671,10 @@ class CondShiftMdl(LatentMdl):
     unitary: int or float
         The value for the conditional output that results in no effect to the parent parameter's output value
     """
-    def __init__(self, cond_shift_eqn: Callable = None, mdl_name: str = None,
-                 unitary_val: int = 0, **latent_vars: LatentVar):
+
+    def __init__(
+        self, cond_shift_eqn: Callable = None, mdl_name: str = None, unitary_val: int = 0, **latent_vars: LatentVar,
+    ):
         """
         Parameters
         ----------
@@ -612,7 +688,10 @@ class CondShiftMdl(LatentMdl):
             Latent variable models used as part of the mechanism's compute equation
         """
         if not cond_shift_eqn:
-            def no_cond_shift(): return unitary_val
+
+            def no_cond_shift():
+                return unitary_val
+
             cond_shift_eqn = no_cond_shift
         self.unitary = unitary_val
         super().__init__(cond_shift_eqn, mdl_name, **latent_vars)
@@ -663,6 +742,7 @@ class InitValMdl(LatentMdl):
     latent_vars: list of str
         A listing of the latent variables that the model's compute equation takes as inputs
     """
+
     def __init__(self, init_val_eqn: Callable = None, mdl_name: str = None, **latent_vars: LatentVar):
         """
         Parameters
@@ -676,7 +756,10 @@ class InitValMdl(LatentMdl):
         """
         # The initial value will likely just be a specified value for most use cases, so default to that behaviour
         if not init_val_eqn:
-            def basic(init_val): return init_val
+
+            def basic(init_val):
+                return init_val
+
             init_val_eqn = basic
         super().__init__(init_val_eqn, mdl_name, **latent_vars)
 
@@ -701,8 +784,7 @@ class InitValMdl(LatentMdl):
         # Can either generate the dev and lot variations here, or they could be provided as method arguments
         latents = self.gen_latent_vals(num_devs, num_chps, num_lots)
         # Compute the initial values using the model's specified equation
-        vals = self.compute(**latents)
-        return vals
+        return self.compute(**latents)
 
 
 class DegPrmMdl(LatentMdl):
@@ -728,9 +810,18 @@ class DegPrmMdl(LatentMdl):
     array_compute: bool
         Flag to indicate whether the parameter's compute equation can accept numpy arrays
     """
-    def __init__(self, deg_mech_mdls: DegMechMdl | FailMechMdl | dict, init_val_mdl: InitValMdl = None,
-                 cond_shift_mdl: CondShiftMdl = None, compute_eqn: Callable = None,
-                 prm_name: str = None, array_computable: bool = True, **latent_vars: LatentVar):
+
+    def __init__(
+        self,
+        deg_mech_mdls: DegMechMdl | FailMechMdl | dict,
+        init_val_mdl: InitValMdl = None,
+        cond_shift_mdl: CondShiftMdl = None,
+        compute_eqn: Callable = None,
+        prm_name: str = None,
+        array_computable: bool = True,
+        time_unit: str = None,
+        **latent_vars: LatentVar,
+    ):
         """
         Parameters
         ----------
@@ -746,31 +837,42 @@ class DegPrmMdl(LatentMdl):
             The name of the degraded parameter (default None)
         array_computable: bool, optional
             Flag to indicate whether the parameter's compute equation can accept numpy arrays (default True)
+        time_unit: str, optional
+            The time unit of the parameter model
         **latent_vars: dict of LatentVar, optional
             Any latent variables used within the degraded parameter's compute equation
         """
+        self.time_unit = time_unit
         self.init_mdl = init_val_mdl if init_val_mdl else InitValMdl(init_val=LatentVar(deter_val=0))
         self.cond_mdl = cond_shift_mdl if cond_shift_mdl else CondShiftMdl()
         # Create attributes for mechanism models based on the model names
         self.mech_mdl_list = []
-        if type(deg_mech_mdls) == dict:
+        if type(deg_mech_mdls) is dict:
             for mech in deg_mech_mdls:
                 deg_mech_mdls[mech].name = mech
-                setattr(self, f"_{mech}_mdl", deg_mech_mdls[mech])
+                setattr(self, f'_{mech}_mdl', deg_mech_mdls[mech])
                 self.mech_mdl_list.append(mech)
         else:
             if not deg_mech_mdls.name:
                 raise UserConfigError('Please specify a name for the degradation mechanism.')
-            setattr(self, f"_{deg_mech_mdls.name}_mdl", deg_mech_mdls)
+            setattr(self, f'_{deg_mech_mdls.name}_mdl', deg_mech_mdls)
             self.mech_mdl_list.append(deg_mech_mdls.name)
         # The computed parameter value is assumed to be just a simple sum of the different components, but
         # allow the user to provide a custom equation just in case
         if not compute_eqn:
+
             def basic_sum(init, cond, **mechs):
                 return init + cond + sum(mechs.values())
+
             compute_eqn = basic_sum
         self.array_compute = array_computable
         super().__init__(compute_eqn, prm_name, **latent_vars)
+
+    def propagate_time_unit(self, dev_time_unit: str = None) -> None:
+        time_unit = self.time_unit if self.time_unit else dev_time_unit
+        for mech in self.mech_mdl_list:
+            if type(self.mech_mdl(mech)) in (DegMechMdl, FailMechMdl):
+                self.mech_mdl(mech).set_time_unit(time_unit)
 
     def mech_mdl(self, mdl):
         """
@@ -785,7 +887,7 @@ class DegPrmMdl(LatentMdl):
         -------
         DegMechMdl or FailMechMdl
         """
-        return getattr(self, f"_{mdl}_mdl")
+        return getattr(self, f'_{mdl}_mdl')
 
     def gen_latent_vals(self, num_devs: int = 1, num_chps: int = 1, num_lots: int = 1) -> dict:
         """
@@ -843,16 +945,17 @@ class DegPrmMdl(LatentMdl):
         for key, val in vals.items():
             if type(val) in [np.ndarray, list]:
                 new[key] = val[:, :, :reduced_size]
-            elif type(val) == dict:
+            elif type(val) is dict:
                 new[key] = self._reduce_dev_dim_size(vals[key], reduced_size)
         return new
 
-    def calc_equiv_strs_times(self, strs_dims: tuple, mech_deg_vals: dict, strs_conds: dict,
-                              init_vals: dict, latents: dict) -> dict[str, np.ndarray]:
+    def calc_equiv_strs_times(
+        self, strs_dims: tuple, mech_deg_vals: dict, strs_conds: dict, init_vals: dict, latents: dict,
+    ) -> dict[str, np.ndarray]:
         """
         This method back-calculates the length of time required to reach the passed output value given the other test
-        conditions and latent parameters. See the Gerabaldi VTS 2023 paper or documentation for a conceptual explanation
-        and detailed procedure information on how these values are computed.
+        conditions and latent parameters. See the VTS 2023 paper (https://doi.org/10.1109/VTS56346.2023.10140111) or
+        documentation for a conceptual explanation and detailed procedure information on how these values are computed.
 
         Parameters
         ----------
@@ -874,15 +977,21 @@ class DegPrmMdl(LatentMdl):
         """
         equiv_times = {}
         for mech in self.mech_mdl_list:
-            args_dict = {'deg_val': mech_deg_vals[mech], 'init_val': init_vals[mech],
-                         'strs_conds': strs_conds, 'latents': latents[mech], 'dims': strs_dims}
+            args_dict = {
+                'deg_val': mech_deg_vals[mech],
+                'init_val': init_vals[mech],
+                'strs_conds': strs_conds,
+                'latents': latents[mech],
+                'dims': strs_dims,
+            }
             # Currently we always loop compute because the numerical method used to calculate equivalent stress time
             # from the SciPy library is not array computable
             equiv_times[mech] = self.mech_mdl(mech).calc_equiv_strs_time(**args_dict)
         return equiv_times
 
-    def calc_deg_vals(self, strs_dims: tuple, times: dict, strs_conds: dict,
-                      init_vals: np.ndarray, latents: dict, deg_vals: dict) -> (np.ndarray, dict):
+    def calc_deg_vals(
+        self, strs_dims: tuple, times: dict, strs_conds: dict, init_vals: np.ndarray, latents: dict, deg_vals: dict,
+    ) -> (np.ndarray, dict):
         """
         Calculate the underlying degraded values for the parameter given a set of stress conditions and stress duration.
         Note that this method does not calculate a measured value, only the 'true' underlying degraded parameter value.
@@ -915,14 +1024,15 @@ class DegPrmMdl(LatentMdl):
         # Calculate the degradation for the mechanism models
         mech_vals = {}
         for mech in self.mech_mdl_list:
-            mech_vals[mech] = self.mech_mdl(mech).calc_deg_vals(times[mech], deg_vals[mech],
-                                                                strs_conds, latents[mech], strs_dims)
+            mech_vals[mech] = self.mech_mdl(mech).calc_deg_vals(
+                times[mech], deg_vals[mech], strs_conds, latents[mech], strs_dims,
+            )
             # Also copy the mechanism degraded vals into the arguments data structure for computing the parameters
             arg_vals[mech] = mech_vals[mech]
 
         # Finally add the parameter equation's latent values
         for arg in self.compute_args:
-            if arg not in arg_vals.keys() and arg in latents:
+            if arg not in arg_vals and arg in latents:
                 arg_vals[arg] = latents[arg]
 
         # Now compute the parameter values using all the calculated mechanism and conditional shift values
@@ -932,8 +1042,9 @@ class DegPrmMdl(LatentMdl):
             prm_vals = _loop_compute(self.compute, arg_vals, strs_dims)
         return prm_vals, mech_vals
 
-    def calc_cond_shifted_vals(self, meas_dims: tuple, strs_conds: dict,
-                               deg_vals: np.ndarray, latents: dict) -> np.ndarray:
+    def calc_cond_shifted_vals(
+        self, meas_dims: tuple, strs_conds: dict, deg_vals: np.ndarray, latents: dict,
+    ) -> np.ndarray:
         """
         Calculation of the degraded value adjusted according to the conditional shift model
 
@@ -970,7 +1081,7 @@ class DegPrmMdl(LatentMdl):
 
         # Next are the parameter's own latent values
         for arg in self.compute_args:
-            if arg not in arg_vals.keys() and arg in latents:
+            if arg not in arg_vals and arg in latents:
                 arg_vals[arg] = latents[arg]
 
         # Now compute the parameter values
@@ -1026,6 +1137,7 @@ class CircPrmMdl(LatentMdl):
     latent_vars: list
         A listing of the latent variables that the model's compute equation takes as inputs
     """
+
     def __init__(self, compute_eqn: Callable, prm_name: str = None, **latent_vars: LatentVar):
         """
         Parameters
@@ -1068,8 +1180,7 @@ class CircPrmMdl(LatentMdl):
             elif arg in degraded_prm_vals:
                 arg_vals[arg] = degraded_prm_vals[arg]
 
-        circ_vals = self.compute(**arg_vals)[:][:][:num_samples]
-        return circ_vals
+        return self.compute(**arg_vals)[:][:][:num_samples]
 
     def get_required_prms(self, mdl_prm_list):
         """
@@ -1088,7 +1199,7 @@ class CircPrmMdl(LatentMdl):
         # Determine which of the list of parameters are used to compute the value of this circuit parameter
         return [prm for prm in mdl_prm_list if prm in self.compute_args]
 
-    def get_dependencies(self, conditions, target: str = None): # noqa: UnusedParameter
+    def get_dependencies(self, conditions, target: str = None):
         """
         Given a list of all stress conditions, get the subset that influence this model's output value
 
@@ -1124,7 +1235,8 @@ class DeviceMdl:
     prm_mdl_list: list of DegPrmMdl or CircPrmMdl
         List of parameters that this device model incorporates, parameter models can be retrieved via the prm_mdl method
     """
-    def __init__(self, prm_mdls: DegPrmMdl | CircPrmMdl | dict, name: str = None):
+
+    def __init__(self, prm_mdls: DegPrmMdl | CircPrmMdl | dict, name: str = None, time_unit: str = None):
         """
         Parameters
         ----------
@@ -1132,20 +1244,30 @@ class DeviceMdl:
             Single parameter model or a mapping from parameter names to parameter models
         name: str
             Descriptive name for the device model
+        time_unit: str, optional
+            The time unit of the device model
         """
+        self.time_unit = time_unit
+
         self.name = name
         # Create attributes for the degraded parameter models based on the model names
         self.prm_mdl_list = []
-        if type(prm_mdls) == dict:
+        if type(prm_mdls) is dict:
             for prm in prm_mdls:
                 prm_mdls[prm].name = prm
-                setattr(self, f"_{prm}_mdl", prm_mdls[prm])
+                setattr(self, f'_{prm}_mdl', prm_mdls[prm])
                 self.prm_mdl_list.append(prm)
         else:
             if not prm_mdls.name:
                 raise UserConfigError('Please specify a name for the device parameter.')
-            setattr(self, f"_{prm_mdls.name}_mdl", prm_mdls)
+            setattr(self, f'_{prm_mdls.name}_mdl', prm_mdls)
             self.prm_mdl_list.append(prm_mdls.name)
+        self.propagate_time_unit()
+
+    def propagate_time_unit(self) -> None:
+        for prm in self.prm_mdl_list:
+            if type(self.prm_mdl(prm)) is DegPrmMdl:
+                self.prm_mdl(prm).propagate_time_unit(self.time_unit)
 
     def prm_mdl(self, mdl):
         """
@@ -1160,7 +1282,7 @@ class DeviceMdl:
         -------
         DegPrmMdl or CircPrmMdl
         """
-        return getattr(self, f"_{mdl}_mdl")
+        return getattr(self, f'_{mdl}_mdl')
 
     def gen_init_state(self, sample_counts: dict, num_chps: int = 1, num_lots: int = 1):
         """
@@ -1185,14 +1307,14 @@ class DeviceMdl:
             # First generate the latent variable values for each model
             latents[prm] = self.prm_mdl(prm).gen_latent_vals(sample_counts[prm], num_chps, num_lots)
             # Now initialize the degradation mechanism progression
-            if type(self.prm_mdl(prm)) == DegPrmMdl:
+            if type(self.prm_mdl(prm)) is DegPrmMdl:
                 init_mech_vals[prm] = self.prm_mdl(prm).gen_init_mech_vals(sample_counts[prm], num_chps, num_lots)
             # Then initialize the un-aged values for the device parameters
             # In case the parameter is not directly measured and instead used in calculating other parameters,
             # ensure that any other parameter will have enough samples for now. Make more efficient in the future.
             if prm not in sample_counts:
                 sample_counts[prm] = max(sample_counts.values())
-            if type(self.prm_mdl(prm)) == DegPrmMdl:
+            if type(self.prm_mdl(prm)) is DegPrmMdl:
                 init_prm_vals[prm] = self.prm_mdl(prm).init_mdl.gen_init_vals(sample_counts[prm], num_chps, num_lots)
         # Return a simulation state containing all the generated initial information about the devices to be tested
         return SimState(init_prm_vals, init_mech_vals, latents)

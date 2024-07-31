@@ -1,18 +1,19 @@
-# Copyright (c) 2023 Ian Hill
+# Copyright (c) 2024 Ian Hill
 # SPDX-License-Identifier: Apache-2.0
 
 import numpy as np
 
 import os
 import sys
+
 # Welcome to the worst parts of Python! This line adds the parent directory of this file to module search path, from
 # which the Gerabaldi module can be seen and then imported. Without this line the script cannot find the module without
 # installing it as a package from pip (which is undesirable because you would have to rebuild the package every time
 # you changed part of the code).
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-import gerabaldi # noqa: ImportNotAtTopOfFile
-from gerabaldi.models import * # noqa: ImportNotAtTopOfFile
-from gerabaldi.helpers import _on_demand_import # noqa: ImportNotAtTopOfFile
+import gerabaldi
+from gerabaldi.models import *
+from gerabaldi.helpers import _on_demand_import
 
 click = _on_demand_import('click')
 plt = _on_demand_import('matplotlib.pyplot', 'matplotlib')
@@ -20,7 +21,6 @@ ticker = _on_demand_import('matplotlib.ticker', 'matplotlib')
 sb = _on_demand_import('seaborn')
 
 DATA_FILE_NAME = 'erosion_report'
-SECONDS_PER_HOUR = 3600
 HOURS_PER_YEAR = 8760
 
 SAMPLES_PER_RIVER = 10
@@ -40,24 +40,29 @@ def run_simulation(save_file: str = None):
     # We will measure/sample 10 individual locations in the river for each measurement
     erosion_meas = MeasSpec({'riverbed_level': SAMPLES_PER_RIVER}, {'tau': 3}, 'Bed Height Sampling')
     # Each stress phase lasts a quarter of a year
-    summer_strs = StrsSpec({'tau': 4}, HOURS_PER_YEAR / 4, 'Summer Season Flow')
-    autumn_strs = StrsSpec({'tau': 2}, HOURS_PER_YEAR / 4, 'Autumn Season Flow')
-    winter_strs = StrsSpec({'tau': 2}, HOURS_PER_YEAR / 4, 'Winter Season Flow')
-    spring_strs = StrsSpec({'tau': 7}, HOURS_PER_YEAR / 4, 'Spring Season Flow')
+    summer_strs = StrsSpec({'tau': 4}, HOURS_PER_YEAR / 4, 'Summer Season Flow', 'h')
+    autumn_strs = StrsSpec({'tau': 2}, HOURS_PER_YEAR / 4, 'Autumn Season Flow', 'h')
+    winter_strs = StrsSpec({'tau': 2}, HOURS_PER_YEAR / 4, 'Winter Season Flow', 'h')
+    spring_strs = StrsSpec({'tau': 7}, HOURS_PER_YEAR / 4, 'Spring Season Flow', 'h')
     # We will monitor 5 different rivers for 10 years
     ten_year_test = TestSpec([erosion_meas], RIVERS_SAMPLED, 1, name='Riverbed Erosion Process')
-    ten_year_test.append_steps([spring_strs, summer_strs, autumn_strs, winter_strs, erosion_meas], HOURS_PER_YEAR * 10)
+    ten_year_test.append_steps(
+        [spring_strs, summer_strs, autumn_strs, winter_strs, erosion_meas], 10 * HOURS_PER_YEAR, 'h',
+    )
 
     ########################################################################
     ### 2. Define the test/field environment                             ###
     ########################################################################
-    river_env = PhysTestEnv(env_vrtns={
-        # The shear stress varies between riverbed locations a bit, but much more so between distinct rivers
-        'tau': EnvVrtnMdl(dev_vrtn_mdl=Normal(0, 0.2), chp_vrtn_mdl=Normal(0, 0.8), batch_vrtn_mdl=Normal(0, 1.2)),
-    }, meas_instms={
-        # We can only measure to the nearest centimetre, and our measurements are typically off by half a centimetre
-        'riverbed_level': MeasInstrument(precision=3, error=Normal(0, 0.005))
-    })
+    river_env = PhysTestEnv(
+        env_vrtns={
+            # The shear stress varies between riverbed locations a bit, but much more so between distinct rivers
+            'tau': EnvVrtnMdl(dev_vrtn_mdl=Normal(0, 0.2), chp_vrtn_mdl=Normal(0, 0.8), batch_vrtn_mdl=Normal(0, 1.2)),
+        },
+        meas_instms={
+            # We can only measure to the nearest centimetre, and our measurements are typically off by half a centimetre
+            'riverbed_level': MeasInstrument(precision=3, error=Normal(0, 0.005)),
+        },
+    )
 
     ########################################################################
     ### 3. Define the physical riverbed erosion model                    ###
@@ -71,19 +76,23 @@ def run_simulation(save_file: str = None):
     def riverbed_level(init, erosion, cond):
         return init - erosion + cond
 
-    river_mdl = DeviceMdl(DegPrmMdl(
-        prm_name='riverbed_level',
-        deg_mech_mdls={
-            'erosion': DegMechMdl(
-                fluvial_erosion_riverbed,
-                k_d=LatentVar(deter_val=1e-5),
-                tau_c=LatentVar(Normal(2.4, 0.02), Normal(1, 0.2)),
-                alpha=LatentVar(Normal(0.9, 0.01), Normal(1, 0.04)),
-            )},
-        init_val_mdl=InitValMdl(init_val=LatentVar(dev_vrtn_mdl=Normal(-2, 0.01), chp_vrtn_mdl=Normal(1, 0.02))),
-        compute_eqn=riverbed_level,
-        array_computable=False
-    ))
+    river_mdl = DeviceMdl(
+        DegPrmMdl(
+            prm_name='riverbed_level',
+            time_unit='hours',
+            deg_mech_mdls={
+                'erosion': DegMechMdl(
+                    fluvial_erosion_riverbed,
+                    k_d=LatentVar(deter_val=1e-5),
+                    tau_c=LatentVar(Normal(2.4, 0.02), Normal(1, 0.2)),
+                    alpha=LatentVar(Normal(0.9, 0.01), Normal(1, 0.04)),
+                ),
+            },
+            init_val_mdl=InitValMdl(init_val=LatentVar(dev_vrtn_mdl=Normal(-2, 0.01), chp_vrtn_mdl=Normal(1, 0.02))),
+            compute_eqn=riverbed_level,
+            array_computable=False,
+        ),
+    )
 
     ########################################################################
     ### 4. Simulate the riverbed erosion over the specified time period  ###
@@ -97,15 +106,14 @@ def run_simulation(save_file: str = None):
 
 
 def visualize(report):
+    report.convert_report_time('hours')
     measured = report.measurements
+    measured['time'] = measured['time'] / HOURS_PER_YEAR
 
     # Reformat dataframe to get ready for plotting
     measured = measured.set_index(['param', 'device #', 'chip #'])
     measured = measured.sort_index()
     measured = measured.drop('lot #', axis=1)
-    # Change time deltas to hours then years for processing
-    measured['time'] = measured['time'].apply(lambda time, **kwargs: time.total_seconds() / SECONDS_PER_HOUR, axis=1)
-    measured['time'] = measured['time'] / HOURS_PER_YEAR
 
     # Set up the plots
     sb.set_theme(style='whitegrid', font='Times New Roman')
@@ -135,10 +143,17 @@ def visualize(report):
         p2.plot(times, avg, color=colour_map[rvr])
         p2.fill_between(times, min_val, max_val, color=colour_map[rvr], alpha=0.2)
 
-    p1.set(ylabel='Riverbed Level Below Ref (metres)', xlabel='Elapsed Time (years)',
-           title='Riverbed Erosion in Five Glacier-Fed Streams')
-    p2.set(ylabel='Riverbed Level Below Reference (metres)', xlabel='Elapsed Time (years)', xlim=(0, 10),
-           title='Riverbed Erosion in Glacial Runoff Streams')
+    p1.set(
+        ylabel='Riverbed Level Below Ref (metres)',
+        xlabel='Elapsed Time (years)',
+        title='Riverbed Erosion in Five Glacier-Fed Streams',
+    )
+    p2.set(
+        ylabel='Riverbed Level Below Reference (metres)',
+        xlabel='Elapsed Time (years)',
+        xlim=(0, 10),
+        title='Riverbed Erosion in Glacial Runoff Streams',
+    )
     p2.grid(alpha=0.2)
     p2.xaxis.set_major_locator(ticker.MultipleLocator(1))
     sb.despine()
@@ -152,7 +167,7 @@ def entry(data_file, save_data):
     if data_file is not None:
         report = SimReport(file=data_file)
     else:
-        data_file = os.path.join(os.path.dirname(__file__), f"data/{DATA_FILE_NAME}.json") if save_data else None
+        data_file = os.path.join(os.path.dirname(__file__), f'data/{DATA_FILE_NAME}.json') if save_data else None
         report = run_simulation(save_file=data_file)
     visualize(report)
 

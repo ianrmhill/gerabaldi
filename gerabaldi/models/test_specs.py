@@ -1,4 +1,4 @@
-# Copyright (c) 2023 Ian Hill
+# Copyright (c) 2024 Ian Hill
 # SPDX-License-Identifier: Apache-2.0
 
 """Classes for defining wear-out tests in terms of conditions, durations, execution steps, and collected data"""
@@ -8,6 +8,7 @@ from __future__ import annotations
 from datetime import timedelta
 
 from gerabaldi.exceptions import UserConfigError
+from gerabaldi.helpers import logger, _convert_time
 
 __all__ = ['MeasSpec', 'StrsSpec', 'TestSpec']
 
@@ -25,6 +26,7 @@ class MeasSpec:
     name: str
         Optional descriptive name for the measurement specification
     """
+
     def __init__(self, sample_counts: dict, conditions: dict, name: str = 'unspecified'):
         """
         Parameters
@@ -54,7 +56,10 @@ class StrsSpec:
     name: str
         Optional descriptive name for the stress specification
     """
-    def __init__(self, conditions: dict, duration: timedelta | int | float, name: str = 'unspecified'):
+
+    def __init__(
+        self, conditions: dict, duration: timedelta | float, name: str = 'unspecified', time_unit: str = None,
+    ):
         """
         Parameters
         ----------
@@ -64,11 +69,15 @@ class StrsSpec:
             Duration of the stress phase
         name: str, optional
             Descriptive name for the stress specification (default 'unspecified')
+        time_unit: str, optional
+            The time unit of the stress specification
         """
         self.conditions = conditions
         # Currently, test lengths use units of hours, but are provided as timedelta objects
-        if type(duration) in [int, float]:
-            duration = timedelta(hours=duration)
+        if type(duration) is not timedelta:
+            if time_unit is None:
+                logger.warn('Stress spec time units not explicitly provided, defaulting to hours.')
+            duration = _convert_time(duration, time_unit)
         # Ensure the duration of the stress phase/cell is not 0
         if duration == timedelta():
             raise UserConfigError(f"Stress Specification '{name}' cannot have a time duration of 0.")
@@ -99,10 +108,17 @@ class TestSpec:
     description: str
         Optional information about the test purpose, motivation, and execution details
     """
+
     __test__ = False
 
-    def __init__(self, sequential_steps: list = None, num_chps: int = 1, num_lots: int = 1,
-                 name: str = 'unspecified', description: str = 'none provided'):
+    def __init__(
+        self,
+        sequential_steps: list = None,
+        num_chps: int = 1,
+        num_lots: int = 1,
+        name: str = 'unspecified',
+        description: str = 'none provided',
+    ):
         """
         Parameters
         ----------
@@ -125,7 +141,12 @@ class TestSpec:
         self.description = description
         self.name = name
 
-    def append_steps(self, steps: MeasSpec | StrsSpec | list, loop_for_duration: timedelta | int | float = None):
+    def append_steps(
+        self,
+        steps: MeasSpec | StrsSpec | list,
+        loop_for_duration: timedelta | float = None,
+        time_unit: str = None,
+    ):
         """
         Append one or more test instruction steps to the end of the existing list of test steps
 
@@ -135,6 +156,8 @@ class TestSpec:
             The test steps to append to the ordered list of steps already included in the test
         loop_for_duration: timedelta or int or float, optional
             If provided, the steps will be appended repeatedly until the added stress time surpasses this duration
+        time_unit: str, optional
+            The time unit of the steps
         """
         # If not looping, simply add the steps onto the test list
         if loop_for_duration is None:
@@ -144,19 +167,22 @@ class TestSpec:
                 self.steps.append(steps)
         else:
             # If we are looping the steps until some amount of elapsed time, we first convert the time for comparison
-            if type(loop_for_duration) != timedelta:
-                duration = timedelta(hours=loop_for_duration)
-            else:
+            if type(loop_for_duration) is timedelta:
                 duration = loop_for_duration
+            else:
+                if time_unit is None:
+                    logger.warn('Append loop time units not explicitly provided, defaulting to hours.')
+                duration = _convert_time(loop_for_duration, time_unit)
 
             # Ensure duration is not 0
             t = timedelta()
             if duration == t:
                 raise UserConfigError('Cannot loop append test steps with a target stress duration of 0.')
             # Ensure steps to add are not purely measurement steps, as that would result in infinite steps being added
-            if type(steps) is MeasSpec or (type(steps) is list and all(isinstance(step, MeasSpec) for step in steps)):
-                raise UserConfigError('Cannot add steps to test in a loop if no stress phase present, infinite'
-                                      'test steps will result.')
+            if type(steps) is MeasSpec or (type(steps) is list and all(type(step) is MeasSpec for step in steps)):
+                raise UserConfigError(
+                    'Cannot add steps to test in a loop if no stress phase present, infinite test steps will result.',
+                )
 
             # Loop, appending the set of steps until the stress duration sums to greater than the total requested
             while t < duration:
@@ -168,15 +194,17 @@ class TestSpec:
                 # Count the total time required for one loop of the steps
                 if type(steps) is list:
                     for step in steps:
-                        if type(step) == StrsSpec:
+                        if type(step) is StrsSpec:
                             t += step.duration
                 else:
                     t += steps.duration
 
             # Check if the duration was an integer multiple of the duration of the set of steps, warn if not
             if not (t / duration).is_integer():
-                raise UserWarning('Appended steps did not result in an integer multiple of the duration, test '
-                                  'may be longer than intended.')
+                raise UserWarning(
+                    'Appended steps did not result in an integer multiple of the loop duration, test '
+                    'may be longer than intended.',
+                )
 
     def calc_samples_needed(self):
         """
@@ -190,7 +218,7 @@ class TestSpec:
         """
         samples_needed = {}
         for step in self.steps:
-            if type(step) == MeasSpec:
+            if type(step) is MeasSpec:
                 for prm in step.measurements:
                     # Add the parameter if not yet encountered
                     if prm not in samples_needed:

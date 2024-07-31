@@ -1,7 +1,9 @@
-# Copyright (c) 2023 Ian Hill
+# Copyright (c) 2024 Ian Hill
 # SPDX-License-Identifier: Apache-2.0
 
 """Internal helper functions used within Gerabaldi to streamline the package."""
+
+from __future__ import annotations
 
 import logging
 import coloredlogs
@@ -10,10 +12,11 @@ import numpy as np
 import pandas as pd
 from datetime import timedelta
 
+from gerabaldi.exceptions import UserConfigError
 
 ### Instantiate default logger upon import of this file so that it is always configured ###
 # Instantiate the logger with default settings
-logger = logging.getLogger("gerabaldi")
+logger = logging.getLogger('gerabaldi')
 # Log output handlers can have their own logging levels, internal logger will collect all levels
 logger.setLevel(logging.DEBUG)
 
@@ -24,12 +27,18 @@ custom_field_styles['name']['color'] = 22
 custom_level_styles = coloredlogs.DEFAULT_LEVEL_STYLES
 custom_level_styles['info']['color'] = 'white'
 # Install one default colourized stream handler set to level INFO; no log files by default
-coloredlogs.install(level='INFO', logger=logger, fmt='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-                    level_styles=custom_level_styles, field_styles=custom_field_styles)
+coloredlogs.install(
+    level='INFO',
+    logger=logger,
+    fmt='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level_styles=custom_level_styles,
+    field_styles=custom_field_styles,
+)
 
 
-def configure_logger(logging_level: int = None,
-                     file_handler: logging.FileHandler = None, stream_handler: logging.StreamHandler = None):
+def configure_logger(
+    logging_level: int = None, file_handler: logging.FileHandler = None, stream_handler: logging.StreamHandler = None,
+):
     """
     Configure the logger based on the user's preference.
 
@@ -68,9 +77,9 @@ def configure_logger(logging_level: int = None,
     existing_stream_handler = None
     existing_file_handler = None
     for handler in logger.handlers:
-        if isinstance(handler, logging.StreamHandler) and not isinstance(handler, logging.FileHandler):
+        if type(handler) is logging.StreamHandler and type(handler) is not logging.FileHandler:
             existing_stream_handler = handler
-        elif isinstance(handler, logging.FileHandler):
+        elif type(handler) is logging.FileHandler:
             existing_file_handler = handler
 
     # If the user provided a custom stream handler, remove the default one, add the custom one
@@ -85,30 +94,56 @@ def configure_logger(logging_level: int = None,
         logger.addHandler(file_handler)
 
 
-def _convert_time(time, units, **kwargs): # noqa: UnusedParameter
-    """Helper function compatible with pandas apply() function for converting between time representations."""
+TIME_UNIT_MAP = {
+    'days': 'days',
+    'd': 'days',
+    'hours': 'hours',
+    'h': 'hours',
+    None: 'hours',
+    'seconds': 'seconds',
+    's': 'seconds',
+    'milliseconds': 'milliseconds',
+    'ms': 'milliseconds',
+    'microseconds': 'microseconds',
+    'us': 'microseconds',
+}
+TIME_SECOND_FACTORS = {'days': 86400, 'hours': 3600, 'seconds': 1, 'milliseconds': 0.001, 'microseconds': 0.000001}
+
+
+def _convert_time(time, units, **kwargs):
+    """Helper function for converting between time representations."""
+    try:
+        td_unit = TIME_UNIT_MAP[units]
+    except KeyError as e:
+        raise UserConfigError(
+            f"Invalid time units '{units}' requested, implemented options are days (d), hours (h), "
+            f"seconds (s), milliseconds (ms), and microseconds (us).",
+        ) from e
     if type(time) in [timedelta, pd.Timedelta]:
-        return time.total_seconds() / units
+        return time.total_seconds() / TIME_SECOND_FACTORS[td_unit]
     else:
-        return timedelta(**{units: time})
+        return timedelta(**{td_unit: time})
 
 
 def _on_demand_import(module: str, pypi_name: str = None):
     try:
-        mod = importlib.import_module(module)
-        return mod
-    except ImportError:
+        return importlib.import_module(module)
+    except (ImportError, SystemError) as e:
         # Module name and pypi package name do not always match, we want to tell the user the package to install
         if not pypi_name:
             pypi_name = module
-        hint = f"Trying to use a feature that requires the optional {module} module. " \
-               f"Please install package '{pypi_name}' first."
+        hint = (
+            f"Trying to use a feature that requires the optional {module} module. "
+            f"Please install or fix package '{pypi_name}' first."
+        )
+        orig_exception = e
 
         class FailedImport:
             """By returning a class that raises an error when used, we can try to import modules at the top of each file
             and only raise errors if we try to use methods of modules that failed to import"""
+
             def __getattr__(self, attr):
-                raise ImportError(hint)
+                raise ImportError(hint) from orig_exception
 
         return FailedImport()
 
@@ -137,7 +172,7 @@ def _get_single_index(vals: dict, i: int, j: int, k: int) -> dict:
     """
     new = {}
     for key, val in vals.items():
-        if type(val) == dict:
+        if type(val) is dict:
             new[key] = _get_single_index(vals[key], i, j, k)
         elif type(val) in [np.ndarray, list]:
             new[key] = val[i][j][k]

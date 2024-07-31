@@ -35,4 +35,11 @@ testpaths = ["tests"]
 
 [tool.ruff]
 line-length = 120
-lint.ignore = ["F403", "F405", "E402", "E741"]
+lint.select = ["ALL"]
+lint.ignore = ["C90", "D", "I", "ANN", "EM", "PLR", "TCH", "FBT", "PTH", "T20",
+    "ARG001", "ARG002", "F403", "F405", "E741", "RET505", "SIM114", "TRY003", "RUF013"]
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101", "SLF001"]
+"demos/*" = ["INP001"]
+[tool.ruff.lint.flake8-quotes]
+inline-quotes = "single"
