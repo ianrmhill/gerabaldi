@@ -40,7 +40,6 @@ TEST_LEN = 24 * 7 * 52 * 2
 NUM_SAMPLES = 100
 C_LATENT = 4e-5
 
-
 def defect_generator_demo_model(time, temp, v_g, t_diel, c, bond_strength, thermal_dist):
     """A toy time-independent defect formation model that includes temperature and voltage dependence. Not a proposed
     TDDB defect formation model."""
@@ -49,37 +48,71 @@ def defect_generator_demo_model(time, temp, v_g, t_diel, c, bond_strength, therm
     return 1 if Uniform().sample() < prob else 0
 
 
-def oxide_failed(
-    init,
-    cond,
-    threshold,
-    defect0,
-    defect1,
-    defect2,
-    defect3,
-    defect4,
-    defect5,
-    defect6,
-    defect7,
-    defect8,
-    defect9,
-    defect10,
-    defect11,
-):
-    # We physically model a transistor oxide layer with 12 possible defect locations
-    layout = np.array(
-        [defect0, defect1, defect2, defect3, defect4, defect5, defect6, defect7, defect8, defect9, defect10, defect11]
-    ).reshape((3, 4))
-    # Determine defects formed based on whether the stochastic defect formation value has hit a threshold
-    oxide = pd.DataFrame(layout).map(lambda deg: 1 if deg > threshold else 0)
-    # Identify if any of the columns in our oxide layer have fully defected
-    conductive_col = False
-    for i in range(len(oxide.columns)):
-        if (oxide[i] == 1).all():
-            conductive_col = True
-            break
-    # The transistor gate oxide breaks down if a conductive channel has formed in a column
-    return 0 if conductive_col or init == 0 else 1
+# Special handling for Python 3.8 due to Pandas 'map' function not being available
+if sys.version_info[1] == 8:
+    def oxide_failed(
+        init,
+        cond,
+        threshold,
+        defect0,
+        defect1,
+        defect2,
+        defect3,
+        defect4,
+        defect5,
+        defect6,
+        defect7,
+        defect8,
+        defect9,
+        defect10,
+        defect11,
+    ):
+        # We physically model a transistor oxide layer with 12 possible defect locations
+        layout = np.array(
+            [defect0, defect1, defect2, defect3, defect4, defect5, defect6, defect7, defect8, defect9, defect10, defect11]
+        ).reshape((3, 4))
+        # Determine defects formed based on whether the stochastic defect formation value has hit a threshold
+        oxide = pd.DataFrame(layout).applymap(lambda deg: 1 if deg > threshold else 0)
+        # Identify if any of the columns in our oxide layer have fully defected
+        conductive_col = False
+        for i in range(len(oxide.columns)):
+            if (oxide[i] == 1).all():
+                conductive_col = True
+                break
+        # The transistor gate oxide breaks down if a conductive channel has formed in a column
+        return 0 if conductive_col or init == 0 else 1
+else:
+    def oxide_failed(
+        init,
+        cond,
+        threshold,
+        defect0,
+        defect1,
+        defect2,
+        defect3,
+        defect4,
+        defect5,
+        defect6,
+        defect7,
+        defect8,
+        defect9,
+        defect10,
+        defect11,
+    ):
+        # We physically model a transistor oxide layer with 12 possible defect locations
+        layout = np.array(
+            [defect0, defect1, defect2, defect3, defect4, defect5, defect6, defect7, defect8, defect9, defect10, defect11]
+        ).reshape((3, 4))
+        # Determine defects formed based on whether the stochastic defect formation value has hit a threshold
+        oxide = pd.DataFrame(layout).map(lambda deg: 1 if deg > threshold else 0)
+        # Identify if any of the columns in our oxide layer have fully defected
+        conductive_col = False
+        for i in range(len(oxide.columns)):
+            if (oxide[i] == 1).all():
+                conductive_col = True
+                break
+        # The transistor gate oxide breaks down if a conductive channel has formed in a column
+        return 0 if conductive_col or init == 0 else 1
 
 
 def single_test(step_val, test):
