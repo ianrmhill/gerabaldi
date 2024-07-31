@@ -1,4 +1,4 @@
-# Copyright (c) 2023 Ian Hill
+# Copyright (c) 2024 Ian Hill
 # SPDX-License-Identifier: Apache-2.0
 
 import numpy as np
@@ -14,5 +14,5 @@ def test_ideal_env():
 def test_volt_temp_env():
     new_env = volt_and_temp_env()
     some_vals = new_env.vrtn_mdl('vdd').batch_vrtn_mdl.sample(5)
-    assert type(some_vals) == np.ndarray
+    assert type(some_vals) is np.ndarray
     assert np.allclose(some_vals, np.array([0, 0, 0, 0, 0]))

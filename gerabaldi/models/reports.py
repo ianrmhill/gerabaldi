@@ -1,4 +1,4 @@
-# Copyright (c) 2023 Ian Hill
+# Copyright (c) 2024 Ian Hill
 # SPDX-License-Identifier: Apache-2.0
 
 """Custom classes for reporting results of Gerabaldi simulations"""
@@ -66,11 +66,11 @@ class SimReport:
         elif file:
             if file:
                 try:
-                    with open(file, 'r') as f:
+                    with open(file) as f:
                         report_json = json.load(f)
-                except FileNotFoundError:
-                    msg = f"Could not find the requested data file {file}, the file does not appear to exist."
-                    raise FileNotFoundError(msg)
+                except FileNotFoundError as e:
+                    msg = f'Could not find the requested data file {file}, the file does not appear to exist.'
+                    raise FileNotFoundError(msg) from e
             self.test_name = report_json['Test Name']
             self.test_description = report_json['Description']
             self.measurements = pd.read_json(report_json['Measurements'])
@@ -79,8 +79,7 @@ class SimReport:
             units = report_json['Time Units'].lower()
             self.time_unit = units
             self.measurements['time'] = self.measurements['time'].apply(_convert_time, units=units, axis=1)
-            self.test_summary['start time'] = self.test_summary['start time'].apply(_convert_time, units=units,
-                                                                                    axis=1)
+            self.test_summary['start time'] = self.test_summary['start time'].apply(_convert_time, units=units, axis=1)
             self.test_summary['end time'] = self.test_summary['end time'].apply(_convert_time, units=units, axis=1)
             self.test_summary['duration'] = self.test_summary['duration'].apply(_convert_time, units=units, axis=1)
         # Allow for empty report initializations, though is not an expected use case
@@ -90,8 +89,13 @@ class SimReport:
             self.num_chps, self.num_lots, self.dev_counts = None, None, None
 
     @staticmethod
-    def format_measurements(measured_vals: list | pd.Series | np.ndarray, prm_name: str,
-                            meas_time: timedelta, meas_step: int, prm_type: str = 'parameter') -> pd.DataFrame:
+    def format_measurements(
+        measured_vals: list | pd.Series | np.ndarray,
+        prm_name: str,
+        meas_time: timedelta,
+        meas_step: int,
+        prm_type: str = 'parameter',
+    ) -> pd.DataFrame:
         """
         Take a set of measured values of a parameter and condition and create a formatted dataframe to report the
         measured values in.
@@ -125,14 +129,17 @@ class SimReport:
         elif prm_type == 'condition':
             num_lots, num_devs, num_meas = measured_vals.shape
             measured_vals = measured_vals.reshape(num_meas * num_devs * num_lots)
-        formatted = pd.DataFrame({'param': prm_name,
-                                  'step #': meas_step,
-                                  'device #': circ_num,
-                                  'chip #': dev_num,
-                                  'lot #': lot_num,
-                                  'time': meas_time,
-                                  'measured': measured_vals})
-        return formatted
+        return pd.DataFrame(
+            {
+                'param': prm_name,
+                'step #': meas_step,
+                'device #': circ_num,
+                'chip #': dev_num,
+                'lot #': lot_num,
+                'time': meas_time,
+                'measured': measured_vals,
+            },
+        )
 
     def add_measurements(self, measured: pd.DataFrame):
         """
@@ -182,10 +189,11 @@ class SimReport:
         else:
             try:
                 units = TIME_UNIT_MAP[time_unit]
-            except KeyError:
+            except KeyError as e:
                 raise UserConfigError(
                     f"Invalid time units '{time_unit}' requested, implemented options are days (d), hours (h), "
-                    f"seconds (s), milliseconds (ms), and microseconds (us).")
+                    f"seconds (s), milliseconds (ms), and microseconds (us).",
+                ) from e
         report_json['Time Units'] = units
 
         meas_cpy = self.measurements.copy()
@@ -203,9 +211,8 @@ class SimReport:
             Path(data_dir).mkdir(exist_ok=True)
             with open(file, 'w') as f:
                 json.dump(report_json, f)
-            logger.info(f"Successfully exported test report {self.test_name} to file.")
-        else:
-            return report_json
+            logger.info(f'Successfully exported test report {self.test_name} to file.')
+        return report_json
 
     def convert_report_time(self, time_unit: str = None) -> None:
         """

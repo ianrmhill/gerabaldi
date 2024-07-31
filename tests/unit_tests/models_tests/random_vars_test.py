@@ -1,13 +1,13 @@
-# Copyright (c) 2023 Ian Hill
+# Copyright (c) 2024 Ian Hill
 # SPDX-License-Identifier: Apache-2.0
 
 """Test set ensuring correct functionality of the custom random variable classes"""
 
-import pytest # noqa: PackageNotInRequirements
+import pytest
 import numpy as np
 
 from gerabaldi.models.random_vars import *
-from gerabaldi.helpers import _on_demand_import # noqa: AccessProtectedMember
+from gerabaldi.helpers import _on_demand_import
 
 pymc = _on_demand_import('pymc')
 
@@ -21,8 +21,11 @@ def test_deterministic_dist():
     # Test the errors that should get raised
     with pytest.raises(NotImplementedError):
         det._get_dist_params()
+    with pytest.raises(NotImplementedError):
         det._get_dist_params('numpy')
+    with pytest.raises(NotImplementedError):
         det._get_dist_params('not_an_option')
+    with pytest.raises(NotImplementedError):
         det.get_cbi_form()
     # Test changing the RV params
     det.value = 5
@@ -57,12 +60,12 @@ def test_normal_dist():
     with pymc.Model():
         dist2 = pymc.Normal('test2')
         dist.name = 'test_name'
-        assert type(dist.get_cbi_form()) == type(dist2)
+        assert type(dist.get_cbi_form()) is type(dist2)
 
 
 def test_gamma_dist():
-    dist = Gamma(alpha=4, beta=1/3, test_seed=2022)
-    assert (dist.name, dist.alpha, dist.beta) == (None, 4, 1/3)
+    dist = Gamma(alpha=4, beta=1 / 3, test_seed=2022)
+    assert (dist.name, dist.alpha, dist.beta) == (None, 4, 1 / 3)
     # Check basic sampling behaviour, first reproducibility
     samples = dist.sample(4)
     assert np.allclose(samples, np.array([34.65049, 27.77787, 13.43644, 2.02734]))
@@ -83,4 +86,4 @@ def test_gamma_dist():
     with pymc.Model():
         dist3 = pymc.Gamma('test3', alpha=2, beta=1)
         dist.name = 'another_name'
-        assert type(dist.get_cbi_form()) == type(dist3)
+        assert type(dist.get_cbi_form()) is type(dist3)

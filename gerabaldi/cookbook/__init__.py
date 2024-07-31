@@ -1,4 +1,4 @@
-# Copyright (c) 2023 Ian Hill
+# Copyright (c) 2024 Ian Hill
 # SPDX-License-Identifier: Apache-2.0
 
 """
@@ -12,5 +12,5 @@ from .test_envs import *
 from .mech_mdls import *
 
 __all__ = test_specs.__all__
-__all__.extend(test_envs.__all__)
-__all__.extend(mech_mdls.__all__)
+__all__ += test_envs.__all__
+__all__ += mech_mdls.__all__

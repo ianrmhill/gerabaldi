@@ -48,17 +48,17 @@ def test_append_steps():
         test.append_steps(steps=stress, loop_for_duration=3, time_unit='test_invalid')
 
     test.append_steps(steps=stress, loop_for_duration=3, time_unit='h')
-    assert len(test.steps) == 3/1
+    assert len(test.steps) == 3 / 1
 
     test = TestSpec()
     stress = StrsSpec(conditions={'temp': 1}, duration=1, time_unit='s')
     test.append_steps(steps=stress, loop_for_duration=3, time_unit='h')
-    assert len(test.steps) == 3/1*SECONDS_PER_HOUR
+    assert len(test.steps) == 3 / 1 * SECONDS_PER_HOUR
 
     test = TestSpec()
     stress = StrsSpec(conditions={'temp': 1}, duration=1, time_unit='h')
     test.append_steps(steps=stress, loop_for_duration=timedelta(hours=3))
-    assert len(test.steps) == 3/1
+    assert len(test.steps) == 3 / 1
 
 
 def test_export_to_json():
@@ -69,11 +69,10 @@ def test_export_to_json():
 
     def ex_eqn(time, temp, a):
         return time * -a * temp
-    dev_mdl = DeviceMdl(
-        {'example_prm': DegPrmMdl(
-            {'linear': DegMechMdl(ex_eqn, a=LatentVar(Normal(1e-3, 2e-4)))})})
+
+    dev_mdl = DeviceMdl({'example_prm': DegPrmMdl({'linear': DegMechMdl(ex_eqn, a=LatentVar(Normal(1e-3, 2e-4)))})})
     report = gerabaldi.simulate(test_spec, dev_mdl, test_env)
-    
+
     with pytest.raises(UserConfigError):
         report.export_to_json(time_unit='test_invalid')
 
@@ -97,23 +96,34 @@ def test_time_unit_propagation():
     fail_mech_0 = FailMechMdl(mdl_name='fail_mech_0', time_unit='ms')
     fail_mech_1 = FailMechMdl(mdl_name='fail_mech_1')
 
-    deg_mech_mdls = {'deg_mech_0': deg_mech_0, 'deg_mech_1': deg_mech_1, 'deg_mech_2': deg_mech_2,
-                     'fail_mech_0': fail_mech_0, 'fail_mech_1': fail_mech_1}
+    deg_mech_mdls = {
+        'deg_mech_0': deg_mech_0,
+        'deg_mech_1': deg_mech_1,
+        'deg_mech_2': deg_mech_2,
+        'fail_mech_0': fail_mech_0,
+        'fail_mech_1': fail_mech_1,
+    }
     prm_mdl_0 = DegPrmMdl(deg_mech_mdls=deg_mech_mdls, time_unit='us')
 
     deg_mech_3 = DegMechMdl(mdl_name='deg_mech_3')
     prm_mdl_1 = DegPrmMdl(deg_mech_mdls=deg_mech_3)
 
-    dev_mdl_0 = DeviceMdl(prm_mdls={'prm_mdl_0': prm_mdl_0, 'prm_mdl_1': prm_mdl_1}, time_unit='s', name='dev_mdl_0')
-    # ------------------------------------------------------------------------------------------------------------------------------------
+    dev_mdl_0 = DeviceMdl(prm_mdls={'prm_mdl_0': prm_mdl_0, 'prm_mdl_1': prm_mdl_1},
+                          time_unit='s', name='dev_mdl_0')
+
     deg_mech_0_new = DegMechMdl(mdl_name='deg_mech_0', time_unit='h')
     deg_mech_1_new = DegMechMdl(mdl_name='deg_mech_1', time_unit='s')
     deg_mech_2_new = DegMechMdl(mdl_name='deg_mech_2')
     fail_mech_0_new = FailMechMdl(mdl_name='fail_mech_0', time_unit='ms')
     fail_mech_1_new = FailMechMdl(mdl_name='fail_mech_1')
 
-    deg_mech_mdls_new = {'deg_mech_0': deg_mech_0_new, 'deg_mech_1': deg_mech_1_new, 'deg_mech_2': deg_mech_2_new,
-                         'fail_mech_0': fail_mech_0_new, 'fail_mech_1': fail_mech_1_new}
+    deg_mech_mdls_new = {
+        'deg_mech_0': deg_mech_0_new,
+        'deg_mech_1': deg_mech_1_new,
+        'deg_mech_2': deg_mech_2_new,
+        'fail_mech_0': fail_mech_0_new,
+        'fail_mech_1': fail_mech_1_new,
+    }
     prm_mdl_0_new = DegPrmMdl(deg_mech_mdls=deg_mech_mdls_new, time_unit='d')
 
     deg_mech_3_new = DegMechMdl(mdl_name='deg_mech_3')
@@ -137,9 +147,14 @@ def test_time_unit_propagation():
 
 
 def test_time_unit():
-    def eqn(a, temp, time): return a * time * temp
-    dev_mdl = DeviceMdl(DegPrmMdl(DegMechMdl(mech_eqn=eqn, mdl_name='test_mdl', time_unit='s',
-                                             a=LatentVar(deter_val=1)), prm_name='current'))
+    def eqn(a, temp, time):
+        return a * time * temp
+
+    dev_mdl = DeviceMdl(
+        DegPrmMdl(
+            DegMechMdl(mech_eqn=eqn, mdl_name='test_mdl', time_unit='s', a=LatentVar(deter_val=1)), prm_name='current',
+        ),
+    )
     meas = MeasSpec({'current': 1}, {'temp': 25})
     strs1 = StrsSpec({'temp': 1}, timedelta(hours=1))
     strs2 = StrsSpec({'temp': 2}, timedelta(hours=1))
@@ -149,8 +164,11 @@ def test_time_unit():
     assert round(report.measurements['measured'][0]) == 3600
     assert round(report.measurements['measured'][1]) == 10800
 
-    dev_mdl = DeviceMdl(DegPrmMdl(DegMechMdl(mech_eqn=eqn, mdl_name='test_mdl', a=LatentVar(deter_val=1)),
-                                  prm_name='current', time_unit='ms'))
+    dev_mdl = DeviceMdl(
+        DegPrmMdl(
+            DegMechMdl(mech_eqn=eqn, mdl_name='test_mdl', a=LatentVar(deter_val=1)), prm_name='current', time_unit='ms',
+        ),
+    )
     meas = MeasSpec({'current': 1}, {'temp': 25})
     strs1 = StrsSpec({'temp': 1}, 1, time_unit='h')
     strs2 = StrsSpec({'temp': 2}, 1000000, time_unit='ms')
@@ -160,8 +178,10 @@ def test_time_unit():
     assert round(report.measurements['measured'][0]) == 3600000
     assert round(report.measurements['measured'][1]) == 5600000
 
-    dev_mdl = DeviceMdl(DegPrmMdl(DegMechMdl(mech_eqn=eqn, mdl_name='test_mdl', a=LatentVar(deter_val=1)),
-                                  prm_name='current'), time_unit='d')
+    dev_mdl = DeviceMdl(
+        DegPrmMdl(DegMechMdl(mech_eqn=eqn, mdl_name='test_mdl', a=LatentVar(deter_val=1)), prm_name='current'),
+        time_unit='d',
+    )
     meas = MeasSpec({'current': 1}, {'temp': 25})
     strs1 = StrsSpec({'temp': 1}, 365, time_unit='d')
     strs2 = StrsSpec({'temp': 2}, timedelta(days=356))

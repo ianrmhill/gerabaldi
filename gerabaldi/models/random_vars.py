@@ -1,4 +1,4 @@
-# Copyright (c) 2023 Ian Hill
+# Copyright (c) 2024 Ian Hill
 # SPDX-License-Identifier: Apache-2.0
 
 """Custom generators for random variables used for experiment simulation and model specification. Necessary as the Numpy
@@ -24,6 +24,7 @@ class RandomVar:
 
     This class is only exposed for typing annotations, do not instantiate directly.
     """
+
     def __init__(self, dist_type: str = None, name: str = None, test_seed: int = None):
         self.name = name
         if dist_type:
@@ -42,7 +43,7 @@ class RandomVar:
         elif target == 'pyro':
             return self._params_for_pyro()
         else:
-            raise NotImplementedError(f"Invalid target library {target} requested.")
+            raise NotImplementedError(f'Invalid target library {target} requested.')
 
     def sample(self, quantity: int = 1) -> np.ndarray:
         """
@@ -78,39 +79,45 @@ class RandomVar:
         """
         if target_framework == 'pymc':
             try:
-                return getattr(pymc, self._dist_type.capitalize()
-                               )(name=self.name, observed=observed, **self._get_dist_params())
-            except AttributeError:
-                raise NotImplementedError(f"Distribution type {self._dist_type} is not implemented in PyMC. Please\n"
-                                          "change the distribution type or create a custom PyMC implementation.")
+                return getattr(pymc, self._dist_type.capitalize())(
+                    name=self.name, observed=observed, **self._get_dist_params(),
+                )
+            except AttributeError as e:
+                raise NotImplementedError(
+                    f'Distribution type {self._dist_type} is not implemented in PyMC. Please\n'
+                    'change the distribution type or create a custom PyMC implementation.',
+                ) from e
         elif target_framework == 'pyro':
             try:
-                return pyro.sample(self.name,
-                                   getattr(dist, self._dist_type.capitalize())(**self._get_dist_params('pyro')))
-            except AttributeError:
-                raise NotImplementedError(f"Distribution type {self._dist_type} is not implemented in pyro. Please\n"
-                                          "change the distribution type or create a custom pyro implementation.")
+                return pyro.sample(
+                    self.name, getattr(dist, self._dist_type.capitalize())(**self._get_dist_params('pyro')),
+                )
+            except AttributeError as e:
+                raise NotImplementedError(
+                    f'Distribution type {self._dist_type} is not implemented in pyro. Please\n'
+                    'change the distribution type or create a custom pyro implementation.',
+                ) from e
         else:
-            raise NotImplementedError(f"Target framework {target_framework} is not yet a supported CBI framework")
+            raise NotImplementedError(f'Target framework {target_framework} is not yet a supported CBI framework')
 
     # From here on down are abstract methods that inheriting distributions should implement
     def _params_for_pymc(self):
-        raise NotImplementedError(f"Distribution {self._dist_type} does not define a mapping to a PyMC form.")
+        raise NotImplementedError(f'Distribution {self._dist_type} does not define a mapping to a PyMC form.')
 
     def _params_for_numpy(self):
-        raise NotImplementedError(f"Distribution {self._dist_type} does not define a mapping to a numpy form.")
+        raise NotImplementedError(f'Distribution {self._dist_type} does not define a mapping to a numpy form.')
 
     def _params_for_pyro(self):
-        raise NotImplementedError(f"Distribution {self._dist_type} does not define a mapping to a Pyro form.")
+        raise NotImplementedError(f'Distribution {self._dist_type} does not define a mapping to a Pyro form.')
 
     def get_centre(self):
-        raise NotImplementedError(f"Distribution {self._dist_type} does not have a defined centre value.")
+        raise NotImplementedError(f'Distribution {self._dist_type} does not have a defined centre value.')
 
     def set_centre(self, value, operation=None):
-        raise NotImplementedError(f"Distribution {self._dist_type} does not have a defined centre value.")
+        raise NotImplementedError(f'Distribution {self._dist_type} does not have a defined centre value.')
 
 
-class Deterministic(RandomVar): # noqa: ImplementAbstract
+class Deterministic(RandomVar):
     """
     A workaround class for non-stochastic variables, always sampling the same target value
 
@@ -119,7 +126,8 @@ class Deterministic(RandomVar): # noqa: ImplementAbstract
     name: str
     value: float or int
     """
-    def __init__(self, value: int | float = 0, **super_opts):
+
+    def __init__(self, value: float = 0, **super_opts):
         """
         Parameters
         ----------
@@ -163,7 +171,8 @@ class Normal(RandomVar):
     sigma: float or int
     name: str
     """
-    def __init__(self, mu: int | float = 0, sigma: int | float = 1, **super_opts):
+
+    def __init__(self, mu: float = 0, sigma: float = 1, **super_opts):
         """
         Parameters
         ----------
@@ -217,7 +226,7 @@ class Normal(RandomVar):
             self.mu = value
 
 
-class Gamma(RandomVar): # noqa: ImplementAbstract
+class Gamma(RandomVar):
     """
     Gamma distribution alpha-beta implementation
 
@@ -227,7 +236,8 @@ class Gamma(RandomVar): # noqa: ImplementAbstract
     beta: float or int
     name: str
     """
-    def __init__(self, alpha: int | float = 2, beta: int | float = 2, **super_opts):
+
+    def __init__(self, alpha: float = 2, beta: float = 2, **super_opts):
         """
         Parameters
         ----------
@@ -255,7 +265,7 @@ class Gamma(RandomVar): # noqa: ImplementAbstract
         return {'concentration': self.alpha, 'rate': self.beta}
 
 
-class Uniform(RandomVar): # noqa: ImplementAbstract
+class Uniform(RandomVar):
     """
     Continuous uniform distribution implementation
 
@@ -265,7 +275,8 @@ class Uniform(RandomVar): # noqa: ImplementAbstract
     stop: float or int
     name: str
     """
-    def __init__(self, start: int | float = 0, stop: int | float = 1, **super_opts):
+
+    def __init__(self, start: float = 0, stop: float = 1, **super_opts):
         """
         Parameters
         ----------

@@ -1,4 +1,4 @@
-# Copyright (c) 2023 Ian Hill
+# Copyright (c) 2024 Ian Hill
 # SPDX-License-Identifier: Apache-2.0
 
 """Custom classes for simulation state persistence"""
@@ -31,8 +31,14 @@ class SimState:
     init_prm_vals: dict
         A nested dictionary structure containing all the current point values for various device parameters
     """
-    def __init__(self, init_prm_vals: dict, init_mech_vals: dict, latent_vals: dict,
-                 elapsed_time: timedelta | int | float = timedelta()):
+
+    def __init__(
+        self,
+        init_prm_vals: dict,
+        init_mech_vals: dict,
+        latent_vals: dict,
+        elapsed_time: timedelta | float = timedelta(),
+    ):
         """
 
         Parameters
