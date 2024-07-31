@@ -23,7 +23,7 @@ def test_init_state_basic():
         return rhyme * time
 
     deg_model = DeviceMdl(
-        DegPrmMdl(DegMechMdl(silly_eqn, mdl_name='some mech', rhyme=LatentVar(deter_val=2)), prm_name='some param'),
+        DegPrmMdl(DegMechMdl(silly_eqn, mdl_name='some mech', rhyme=LatentVar(deter_val=2)), prm_name='some param')
     )
     init_state = gerabaldi.gen_init_state(deg_model, dev_counts={'some param': 10})
     # Check all the defaults
@@ -46,7 +46,7 @@ def test_init_state_basic():
                         deter_val=1,
                         dev_vrtn_mdl=Normal(1, 0.01, test_seed=2222),
                         lot_vrtn_mdl=Normal(1, 0.01, test_seed=3333),
-                    ),
+                    )
                 ),
             ),
             'gain': DegPrmMdl(
@@ -56,10 +56,10 @@ def test_init_state_basic():
                     base=LatentVar(deter_val=0, vrtn_type='offset', dev_vrtn_mdl=Normal(1, 0.02, test_seed=4444)),
                 ),
                 init_val_mdl=InitValMdl(
-                    init_val=LatentVar(deter_val=0, vrtn_type='offset', chp_vrtn_mdl=Normal(-0.2, 2, test_seed=5555)),
+                    init_val=LatentVar(deter_val=0, vrtn_type='offset', chp_vrtn_mdl=Normal(-0.2, 2, test_seed=5555))
                 ),
             ),
-        },
+        }
     )
     # Run the initial state generator
     init_state = gerabaldi.gen_init_state(deg_model, dev_counts={'freq': 10, 'gain': 5}, num_chps=3, num_lots=4)
@@ -83,11 +83,11 @@ def test_sim_stress_step_basic():
             'current': DegPrmMdl(
                 DegMechMdl(linear_deg, scale_factor=LatentVar(deter_val=2e-4), mdl_name='mech1'),
                 InitValMdl(init_val=LatentVar(deter_val=4e-3)),
-            ),
-        },
+            )
+        }
     )
     phys_state = gerabaldi.gen_init_state(
-        deg_model, test_spec.calc_samples_needed(), test_spec.num_chps, test_spec.num_lots,
+        deg_model, test_spec.calc_samples_needed(), test_spec.num_chps, test_spec.num_lots
     )
     test_env = PhysTestEnv()
     report = SimReport(test_spec)
@@ -126,13 +126,13 @@ def test_sim_meas_step_basic(sequential_var):
             DegMechMdl(dummy_eqn, mdl_name='dummy'),
             InitValMdl(init_val=LatentVar(deter_val=4e-2, vrtn_type='offset', dev_vrtn_mdl=sequential_var(1, 1e-2))),
             CondShiftMdl(
-                cond_eqn, c=LatentVar(deter_val=1e-2, vrtn_type='offset', dev_vrtn_mdl=sequential_var(0, 1e-3)),
+                cond_eqn, c=LatentVar(deter_val=1e-2, vrtn_type='offset', dev_vrtn_mdl=sequential_var(0, 1e-3))
             ),
             prm_name='current',
-        ),
+        )
     )
     test_env = PhysTestEnv(
-        meas_instms={'temp': MeasInstrument('temp', precision=2), 'current': MeasInstrument('current', precision=5)},
+        meas_instms={'temp': MeasInstrument('temp', precision=2), 'current': MeasInstrument('current', precision=5)}
     )
 
     deg_state = gerabaldi.gen_init_state(sim_model, dev_counts={'current': 10}, elapsed_time=10, num_chps=2)
@@ -156,7 +156,7 @@ def test_wearout_test_sim_basic():
     meas = MeasSpec({'temp': 1, 'current': 3}, {'temp': 40}, name='cold but not too cold')
     strs = StrsSpec({'temp': 125}, timedelta(hours=10), name='Gimme 10')
     test = TestSpec(
-        [meas, strs, meas, strs, meas], description='Test test test test', name='Test!', num_chps=3, num_lots=2,
+        [meas, strs, meas, strs, meas], description='Test test test test', name='Test!', num_chps=3, num_lots=2
     )
 
     def log_deg(scale_factor, temp, time):
@@ -170,10 +170,10 @@ def test_wearout_test_sim_basic():
                 mdl_name='test_mech',
             ),
             InitValMdl(
-                init_val=LatentVar(deter_val=4e-3, dev_vrtn_mdl=Normal(0, 2e-3, test_seed=666), vrtn_type='offset'),
+                init_val=LatentVar(deter_val=4e-3, dev_vrtn_mdl=Normal(0, 2e-3, test_seed=666), vrtn_type='offset')
             ),
             prm_name='current',
-        ),
+        )
     )
 
     test_env = PhysTestEnv()
@@ -269,7 +269,7 @@ def test_vts_paper_example_1():
         env_vrtns={
             'temp': EnvVrtnMdl(dev_vrtn_mdl=Normal(0, 0.05, test_seed=123), chp_vrtn_mdl=Normal(0, 0.2, test_seed=234)),
             'vdd': EnvVrtnMdl(
-                dev_vrtn_mdl=Normal(0, 0.0003, test_seed=345), chp_vrtn_mdl=Normal(0, 0.0005, test_seed=456),
+                dev_vrtn_mdl=Normal(0, 0.0003, test_seed=345), chp_vrtn_mdl=Normal(0, 0.0005, test_seed=456)
             ),
         },
         meas_instms={'temp': MeasInstrument(), 'vdd': MeasInstrument(), 'amp_gain': MeasInstrument()},
@@ -344,7 +344,7 @@ def test_vts_paper_example_1():
                         chp_vrtn_mdl=Normal(0, 0.0002, test_seed=680),
                         lot_vrtn_mdl=Normal(0, 0.0003, test_seed=791),
                         vrtn_type='offset',
-                    ),
+                    )
                 ),
                 compute_eqn=v_th_eqn,
             ),
@@ -356,7 +356,7 @@ def test_vts_paper_example_1():
                 l=LatentVar(deter_val=2),
                 v_e=LatentVar(deter_val=5),
             ),
-        },
+        }
     )
 
     ### 4. Simulate the stress tests at different temperatures ###
@@ -395,25 +395,11 @@ def test_vts_paper_example_2():
         return 1 if sampler.sample() < (time * defect_gen_prob) else 0
 
     def oxide_failed(
-        init,
-        cond,
-        threshold,
-        dfct0,
-        dfct1,
-        dfct2,
-        dfct3,
-        dfct4,
-        dfct5,
-        dfct6,
-        dfct7,
-        dfct8,
-        dfct9,
-        dfct10,
-        dfct11,
+        init, cond, threshold, dfct0, dfct1, dfct2, dfct3, dfct4, dfct5, dfct6, dfct7, dfct8, dfct9, dfct10, dfct11
     ):
         # We physically model a transistor oxide layer with 12 possible defect locations
         layout = np.array(
-            [dfct0, dfct1, dfct2, dfct3, dfct4, dfct5, dfct6, dfct7, dfct8, dfct9, dfct10, dfct11],
+            [dfct0, dfct1, dfct2, dfct3, dfct4, dfct5, dfct6, dfct7, dfct8, dfct9, dfct10, dfct11]
         ).reshape((3, 4))
         oxide = pd.DataFrame(layout).applymap(lambda deg: 1 if deg > threshold else 0)
         conductive_col = False
@@ -440,7 +426,7 @@ def test_vts_paper_example_2():
                 compute_eqn=oxide_failed,
                 array_computable=False,
                 threshold=LatentVar(deter_val=0.5),
-            ),
+            )
         )
         return gerabaldi.simulate(test, tddb_model, env)
 
@@ -464,7 +450,7 @@ def test_vts_paper_example_2():
         env_vrtns={
             'temp': EnvVrtnMdl(dev_vrtn_mdl=Gamma(2, 1, test_seed=909), chp_vrtn_mdl=Normal(0, 0.3, test_seed=707)),
             'v_g': EnvVrtnMdl(
-                dev_vrtn_mdl=Normal(0, 0.008, test_seed=505), chp_vrtn_mdl=Normal(0, 0.003, test_seed=606),
+                dev_vrtn_mdl=Normal(0, 0.008, test_seed=505), chp_vrtn_mdl=Normal(0, 0.003, test_seed=606)
             ),
         },
         meas_instms={'temp': MeasInstrument(error=Normal(0, 1, test_seed=401), precision=4, meas_lims=(-40, 150))},

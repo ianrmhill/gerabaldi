@@ -47,7 +47,7 @@ def run_simulation(save_file: str = None):
     # We will monitor 5 different rivers for 10 years
     ten_year_test = TestSpec([erosion_meas], RIVERS_SAMPLED, 1, name='Riverbed Erosion Process')
     ten_year_test.append_steps(
-        [spring_strs, summer_strs, autumn_strs, winter_strs, erosion_meas], 10 * HOURS_PER_YEAR, 'h',
+        [spring_strs, summer_strs, autumn_strs, winter_strs, erosion_meas], 10 * HOURS_PER_YEAR, 'h'
     )
 
     ########################################################################
@@ -56,11 +56,11 @@ def run_simulation(save_file: str = None):
     river_env = PhysTestEnv(
         env_vrtns={
             # The shear stress varies between riverbed locations a bit, but much more so between distinct rivers
-            'tau': EnvVrtnMdl(dev_vrtn_mdl=Normal(0, 0.2), chp_vrtn_mdl=Normal(0, 0.8), batch_vrtn_mdl=Normal(0, 1.2)),
+            'tau': EnvVrtnMdl(dev_vrtn_mdl=Normal(0, 0.2), chp_vrtn_mdl=Normal(0, 0.8), batch_vrtn_mdl=Normal(0, 1.2))
         },
         meas_instms={
             # We can only measure to the nearest centimetre, and our measurements are typically off by half a centimetre
-            'riverbed_level': MeasInstrument(precision=3, error=Normal(0, 0.005)),
+            'riverbed_level': MeasInstrument(precision=3, error=Normal(0, 0.005))
         },
     )
 
@@ -86,12 +86,12 @@ def run_simulation(save_file: str = None):
                     k_d=LatentVar(deter_val=1e-5),
                     tau_c=LatentVar(Normal(2.4, 0.02), Normal(1, 0.2)),
                     alpha=LatentVar(Normal(0.9, 0.01), Normal(1, 0.04)),
-                ),
+                )
             },
             init_val_mdl=InitValMdl(init_val=LatentVar(dev_vrtn_mdl=Normal(-2, 0.01), chp_vrtn_mdl=Normal(1, 0.02))),
             compute_eqn=riverbed_level,
             array_computable=False,
-        ),
+        )
     )
 
     ########################################################################
@@ -163,13 +163,23 @@ def visualize(report):
 @click.command
 @click.option('--data-file', default=None, help='Use existing simulated data from a JSON file.')
 @click.option('--save-data', is_flag=True, default=False, help='If provided, simulated data will be saved to a JSON.')
-def entry(data_file, save_data):
+@click.option('--test', is_flag=True, default=False, help='No plotting will occur, an output code is generated.')
+def entry(data_file, save_data, test):
     if data_file is not None:
         report = SimReport(file=data_file)
     else:
         data_file = os.path.join(os.path.dirname(__file__), f'data/{DATA_FILE_NAME}.json') if save_data else None
         report = run_simulation(save_file=data_file)
-    visualize(report)
+    if test:
+        checks = [
+            len(report.measurements.index) == 550,
+            report.test_summary.at[33, 'step name'] == 'Autumn Season Flow',
+            report.test_summary.at[42, 'tau'] == 4,
+            report.dev_counts['riverbed_level'] == 10,
+        ]
+        sys.exit(0 if all(checks) else 1)
+    else:
+        visualize(report)
 
 
 if __name__ == '__main__':

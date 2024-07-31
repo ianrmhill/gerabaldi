@@ -118,27 +118,31 @@ class SimReport:
         pandas.DataFrame
             A formatted tabular structure that can be concatenated/appended to other sets of formatted measurements
         """
-        circ_num, dev_num, lot_num = None, None, None
+        dev_num, chp_num, lot_num = None, None, None
+        measd = np.array(measured_vals)
+        if len(measd.shape) == 3:
+            num_lots, num_chps, num_devs = measd.shape
+        elif len(measd.shape) == 2:
+            num_lots, num_chps, num_devs = 1, measd.shape[0], measd.shape[1]
+        else:
+            num_lots, num_chps, num_devs = 1, 1, measd.shape[0]
+        measd = measd.reshape(num_devs * num_chps * num_lots)
+
         if prm_type == 'parameter':
-            measured_vals = np.array(measured_vals)
-            num_lots, num_devs, num_meas = measured_vals.shape
-            measured_vals = measured_vals.reshape(num_meas * num_devs * num_lots)
-            circ_num = np.tile(np.linspace(0, num_meas - 1, num_meas, dtype=int), num_devs * num_lots)
-            dev_num = np.tile(np.repeat(np.linspace(0, num_devs - 1, num_devs, dtype=int), num_meas), num_lots)
-            lot_num = np.repeat(np.linspace(0, num_lots - 1, num_lots, dtype=int), num_meas * num_devs)
-        elif prm_type == 'condition':
-            num_lots, num_devs, num_meas = measured_vals.shape
-            measured_vals = measured_vals.reshape(num_meas * num_devs * num_lots)
+            dev_num = np.tile(np.linspace(0, num_devs - 1, num_devs, dtype=int), num_chps * num_lots)
+            chp_num = np.tile(np.repeat(np.linspace(0, num_chps - 1, num_chps, dtype=int), num_devs), num_lots)
+            lot_num = np.repeat(np.linspace(0, num_lots - 1, num_lots, dtype=int), num_devs * num_chps)
+
         return pd.DataFrame(
             {
                 'param': prm_name,
                 'step #': meas_step,
-                'device #': circ_num,
-                'chip #': dev_num,
+                'device #': dev_num,
+                'chip #': chp_num,
                 'lot #': lot_num,
                 'time': meas_time,
-                'measured': measured_vals,
-            },
+                'measured': measd,
+            }
         )
 
     def add_measurements(self, measured: pd.DataFrame):
@@ -191,8 +195,8 @@ class SimReport:
                 units = TIME_UNIT_MAP[time_unit]
             except KeyError as e:
                 raise UserConfigError(
-                    f"Invalid time units '{time_unit}' requested, implemented options are days (d), hours (h), "
-                    f"seconds (s), milliseconds (ms), and microseconds (us).",
+                    f'Invalid time units "{time_unit}" requested, implemented options are days (d), hours (h), '
+                    f'seconds (s), milliseconds (ms), and microseconds (us).'
                 ) from e
         report_json['Time Units'] = units
 

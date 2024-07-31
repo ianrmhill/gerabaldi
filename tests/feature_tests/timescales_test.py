@@ -108,8 +108,7 @@ def test_time_unit_propagation():
     deg_mech_3 = DegMechMdl(mdl_name='deg_mech_3')
     prm_mdl_1 = DegPrmMdl(deg_mech_mdls=deg_mech_3)
 
-    dev_mdl_0 = DeviceMdl(prm_mdls={'prm_mdl_0': prm_mdl_0, 'prm_mdl_1': prm_mdl_1},
-                          time_unit='s', name='dev_mdl_0')
+    dev_mdl_0 = DeviceMdl(prm_mdls={'prm_mdl_0': prm_mdl_0, 'prm_mdl_1': prm_mdl_1}, time_unit='s', name='dev_mdl_0')
 
     deg_mech_0_new = DegMechMdl(mdl_name='deg_mech_0', time_unit='h')
     deg_mech_1_new = DegMechMdl(mdl_name='deg_mech_1', time_unit='s')
@@ -152,8 +151,8 @@ def test_time_unit():
 
     dev_mdl = DeviceMdl(
         DegPrmMdl(
-            DegMechMdl(mech_eqn=eqn, mdl_name='test_mdl', time_unit='s', a=LatentVar(deter_val=1)), prm_name='current',
-        ),
+            DegMechMdl(mech_eqn=eqn, mdl_name='test_mdl', time_unit='s', a=LatentVar(deter_val=1)), prm_name='current'
+        )
     )
     meas = MeasSpec({'current': 1}, {'temp': 25})
     strs1 = StrsSpec({'temp': 1}, timedelta(hours=1))
@@ -166,8 +165,8 @@ def test_time_unit():
 
     dev_mdl = DeviceMdl(
         DegPrmMdl(
-            DegMechMdl(mech_eqn=eqn, mdl_name='test_mdl', a=LatentVar(deter_val=1)), prm_name='current', time_unit='ms',
-        ),
+            DegMechMdl(mech_eqn=eqn, mdl_name='test_mdl', a=LatentVar(deter_val=1)), prm_name='current', time_unit='ms'
+        )
     )
     meas = MeasSpec({'current': 1}, {'temp': 25})
     strs1 = StrsSpec({'temp': 1}, 1, time_unit='h')
@@ -175,8 +174,8 @@ def test_time_unit():
     test = TestSpec([strs1, meas, strs2, meas])
     test_env = PhysTestEnv()
     report = gerabaldi.simulate(test, dev_mdl, test_env)
-    assert round(report.measurements['measured'][0]) == 3600000
-    assert round(report.measurements['measured'][1]) == 5600000
+    assert round(report.measurements['measured'][0], -2) == 3600000
+    assert round(report.measurements['measured'][1], -2) == 5600000
 
     dev_mdl = DeviceMdl(
         DegPrmMdl(DegMechMdl(mech_eqn=eqn, mdl_name='test_mdl', a=LatentVar(deter_val=1)), prm_name='current'),

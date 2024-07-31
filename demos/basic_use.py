@@ -49,7 +49,7 @@ def run_simulation(save_file: str = None):
         return time * -a * temp
 
     dev_mdl = DeviceMdl(
-        {'example_prm': DegPrmMdl({'linear': DegMechMdl(ex_eqn, a=LatentVar(Normal(1e-3, 2e-4)), time_unit='h')})},
+        {'example_prm': DegPrmMdl({'linear': DegMechMdl(ex_eqn, a=LatentVar(Normal(1e-3, 2e-4)), time_unit='h')})}
     )
 
     ########################################################################
@@ -89,13 +89,23 @@ def visualize(report):
 @click.command
 @click.option('--data-file', default=None, help='Use existing simulated data from a JSON file.')
 @click.option('--save-data', is_flag=True, default=False, help='If provided, simulated data will be saved to a JSON.')
-def entry(data_file, save_data):
+@click.option('--test', is_flag=True, default=False, help='No plotting will occur, an output code is generated.')
+def entry(data_file, save_data, test):
     if data_file is not None:
         report = SimReport(file=data_file)
     else:
         data_file = os.path.join(os.path.dirname(__file__), f'data/{DATA_FILE_NAME}.json') if save_data else None
         report = run_simulation(save_file=data_file)
-    visualize(report)
+    if test:
+        checks = [
+            len(report.measurements.index) == 10,
+            report.test_summary.at[2, 'temp'] == 298.15,
+            report.test_summary.at[1, 'end time'].total_seconds() / 3600 == 100,
+            report.dev_counts['example_prm'] == 5,
+        ]
+        sys.exit(0 if all(checks) else 1)
+    else:
+        visualize(report)
 
 
 if __name__ == '__main__':

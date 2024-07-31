@@ -57,7 +57,7 @@ def gen_init_state(
     else:
         raise UserConfigError(
             'The number of devices for each parameter must be specified either manually or by report.'
-            'Cannot provide neither or both.',
+            'Cannot provide neither or both.'
         )
 
     # Check the parameter dependencies for each circuit parameter that could depend on one or more degraded parameters
@@ -87,7 +87,7 @@ def gen_init_state(
 
 
 def _sim_stress_step(
-    step: StrsSpec, sim_state: SimState, dev_mdl: DeviceMdl, test_env: PhysTestEnv, report: SimReport, step_id: int,
+    step: StrsSpec, sim_state: SimState, dev_mdl: DeviceMdl, test_env: PhysTestEnv, report: SimReport, step_id: int
 ):
     # 1. Build the stochastically-adjusted set of stress conditions
     # Only need to generate stress conditions for device parameters that degrade, get the list of those parameters
@@ -137,7 +137,7 @@ def _sim_stress_step(
 
 
 def _sim_meas_step(
-    step: MeasSpec, sim_state: SimState, dev_mdl: DeviceMdl, test_env: PhysTestEnv, report: SimReport, step_id: int,
+    step: MeasSpec, sim_state: SimState, dev_mdl: DeviceMdl, test_env: PhysTestEnv, report: SimReport, step_id: int
 ):
     """
     Given a test measurement specification, generate the set of observed values. The baseline/true parameter values
@@ -164,7 +164,7 @@ def _sim_meas_step(
         elif prm in dev_mdl.prm_mdl_list:
             # Derived parameter values that can depend on multiple degraded parameters, i.e. circuit models
             measured = dev_mdl.prm_mdl(prm).calc_circ_vals(
-                step.measurements[prm], conds[prm], sim_state.curr_prm_vals, sim_state.latent_var_vals[prm],
+                step.measurements[prm], conds[prm], sim_state.curr_prm_vals, sim_state.latent_var_vals[prm]
             )
             measured = SimReport.format_measurements(measured, prm, sim_state.elapsed, step_id, 'parameter')
 

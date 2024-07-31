@@ -80,22 +80,22 @@ class RandomVar:
         if target_framework == 'pymc':
             try:
                 return getattr(pymc, self._dist_type.capitalize())(
-                    name=self.name, observed=observed, **self._get_dist_params(),
+                    name=self.name, observed=observed, **self._get_dist_params()
                 )
             except AttributeError as e:
                 raise NotImplementedError(
                     f'Distribution type {self._dist_type} is not implemented in PyMC. Please\n'
-                    'change the distribution type or create a custom PyMC implementation.',
+                    'change the distribution type or create a custom PyMC implementation.'
                 ) from e
         elif target_framework == 'pyro':
             try:
                 return pyro.sample(
-                    self.name, getattr(dist, self._dist_type.capitalize())(**self._get_dist_params('pyro')),
+                    self.name, getattr(dist, self._dist_type.capitalize())(**self._get_dist_params('pyro'))
                 )
             except AttributeError as e:
                 raise NotImplementedError(
                     f'Distribution type {self._dist_type} is not implemented in pyro. Please\n'
-                    'change the distribution type or create a custom pyro implementation.',
+                    'change the distribution type or create a custom pyro implementation.'
                 ) from e
         else:
             raise NotImplementedError(f'Target framework {target_framework} is not yet a supported CBI framework')

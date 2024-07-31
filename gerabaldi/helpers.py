@@ -37,7 +37,7 @@ coloredlogs.install(
 
 
 def configure_logger(
-    logging_level: int = None, file_handler: logging.FileHandler = None, stream_handler: logging.StreamHandler = None,
+    logging_level: int = None, file_handler: logging.FileHandler = None, stream_handler: logging.StreamHandler = None
 ):
     """
     Configure the logger based on the user's preference.
@@ -117,7 +117,7 @@ def _convert_time(time, units, **kwargs):
     except KeyError as e:
         raise UserConfigError(
             f"Invalid time units '{units}' requested, implemented options are days (d), hours (h), "
-            f"seconds (s), milliseconds (ms), and microseconds (us).",
+            f'seconds (s), milliseconds (ms), and microseconds (us).'
         ) from e
     if type(time) in [timedelta, pd.Timedelta]:
         return time.total_seconds() / TIME_SECOND_FACTORS[td_unit]
@@ -133,8 +133,8 @@ def _on_demand_import(module: str, pypi_name: str = None):
         if not pypi_name:
             pypi_name = module
         hint = (
-            f"Trying to use a feature that requires the optional {module} module. "
-            f"Please install or fix package '{pypi_name}' first."
+            f'Trying to use a feature that requires the optional {module} module. '
+            f'Please install or fix package "{pypi_name}" first.'
         )
         orig_exception = e
 

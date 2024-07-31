@@ -188,7 +188,7 @@ def test_deg_prm_mdl(sequential_var):
     prms, mechs = mdl.calc_deg_vals((1, 1, 3), {'sample_mech': 10}, conditions, init_prm_vals, latents, init_mech_vals)
     assert np.allclose(prms.round(4), [[[28.2031, 50.1494, 98.8683]]])
     prms = mdl.calc_cond_shifted_vals(
-        (1, 1, 3), {'temp': 125, 'vdd': 0.6}, np.array([[[28.2031, 50.1494, 98.8683]]]), latents,
+        (1, 1, 3), {'temp': 125, 'vdd': 0.6}, np.array([[[28.2031, 50.1494, 98.8683]]]), latents
     )
     assert np.allclose(prms.round(4), [[[126.6979, 241.7009, 461.0473]]])
 
@@ -197,17 +197,17 @@ def test_deg_prm_mdl(sequential_var):
     prms, mechs = mdl.calc_deg_vals((1, 1, 3), {'sample_mech': 10}, conditions, init_prm_vals, latents, init_mech_vals)
     assert np.allclose(prms.round(4), [[[28.2031, 50.1494, 98.8683]]])
     prms = mdl.calc_cond_shifted_vals(
-        (1, 1, 3), {'temp': 125, 'vdd': 0.6}, np.array([[[28.2031, 50.1494, 98.8683]]]), latents,
+        (1, 1, 3), {'temp': 125, 'vdd': 0.6}, np.array([[[28.2031, 50.1494, 98.8683]]]), latents
     )
     assert np.allclose(prms.round(4), [[[126.6979, 241.7009, 461.0473]]])
 
     # Test equivalent time calculation
     equiv_times = mdl.calc_equiv_strs_times(
-        (1, 1, 3), {'sample_mech': [[[26.2031, 47.1494, 94.8683]]]}, conditions, init_mech_vals, latents,
+        (1, 1, 3), {'sample_mech': [[[26.2031, 47.1494, 94.8683]]]}, conditions, init_mech_vals, latents
     )
     assert np.allclose(equiv_times['sample_mech'].round(4), [[[10, 10, 10]]])
     conditions = {'temp': 26, 'vdd': 0.55}
     equiv_times = mdl.calc_equiv_strs_times(
-        (1, 1, 3), {'sample_mech': [[[26.2031, 47.1494, 94.8683]]]}, conditions, init_mech_vals, latents,
+        (1, 1, 3), {'sample_mech': [[[26.2031, 47.1494, 94.8683]]]}, conditions, init_mech_vals, latents
     )
     assert np.allclose(equiv_times['sample_mech'].round(4), [[[9.007, 10, 13.3136]]])

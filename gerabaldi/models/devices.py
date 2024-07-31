@@ -7,9 +7,9 @@ from __future__ import annotations
 
 import inspect
 import numpy as np
-from scipy.optimize import minimize_scalar
 from typing import Callable
 
+from gerabaldi.math import minimize
 from gerabaldi.models.random_vars import RandomVar, Deterministic
 from gerabaldi.models.states import SimState
 from gerabaldi.exceptions import InvalidTypeError, UserConfigError
@@ -117,7 +117,7 @@ class LatentVar:
         if not dev_vrtn_mdl and deter_val is None:
             raise UserConfigError(
                 f'Latent {self.name} definition must include either a device distribution or'
-                'deterministic value argument.',
+                'deterministic value argument.'
             )
 
     def __setattr__(self, name, value):
@@ -415,7 +415,7 @@ class MechMdl(LatentMdl):
                 self.time_unit = prm_time_unit
 
     def calc_deg_vals(
-        self, times: np.ndarray, pre_deg_vals: np.ndarray, strs_conds: dict, latents: dict, dims: tuple,
+        self, times: np.ndarray, pre_deg_vals: np.ndarray, strs_conds: dict, latents: dict, dims: tuple
     ) -> np.ndarray:
         """
         Calculate the underlying degraded values for the parameter given a set of stress conditions and stress duration.
@@ -506,7 +506,7 @@ class DegMechMdl(MechMdl):
         super().__init__(mech_eqn, mdl_name, unitary_val, time_unit, **latent_vars)
 
     def calc_equiv_strs_time(
-        self, deg_val: float, init_val: float, strs_conds: dict, latents: dict, dims: tuple,
+        self, deg_val: float, init_val: float, strs_conds: dict, latents: dict, dims: tuple
     ) -> float:
         """
         This method back-calculates the length of time required to reach the current level of degradation under a given
@@ -542,11 +542,14 @@ class DegMechMdl(MechMdl):
                 elif arg in conds:
                     arg_vals[arg] = conds[arg]
             # Calculate the degradation for the sample
-            return abs(curr_deg_val - self.compute(**arg_vals))
+            try:
+                return abs(curr_deg_val - self.compute(**arg_vals))
+            except ValueError:
+                return abs(curr_deg_val - _loop_compute(self.compute, arg_vals, dims))
 
-        # Minimize the difference between the output and the target/observed value using scipy optimizer
-        # Since we are minimizing time we use the bounded method to ensure our time doesn't go negative
-        return minimize_scalar(residue, args=(deg_val, strs_conds, latents), method='bounded', bounds=(0, 1e10)).x
+        # Find the time/zero point at which the current degradation is achieved under the new stress conditions
+        return minimize(residue, extra_args={'curr_deg_val': deg_val, 'conds': strs_conds, 'ltnts': latents},
+                        bounds=(1e-3, 1e10), maxiter=50, log_gold=True)
 
 
 class FailMechMdl(MechMdl):
@@ -592,8 +595,8 @@ class FailMechMdl(MechMdl):
         super().__init__(mech_eqn, mdl_name, unitary_val, time_unit, **latent_vars)
 
     def calc_equiv_strs_time(
-        self, deg_val: float, init_val: float, strs_conds: dict, latents: dict, dims: tuple,
-) -> float:
+        self, deg_val: np.ndarray | float, init_val: np.ndarray | float, strs_conds: dict, latents: dict, dims: tuple
+    ) -> np.ndarray | float:
         """
         This method matches the signature of the DegMechMdl implementation but always returns zero. This is because a
         hard-failure mechanism has no degradation component, only instantaneous failures, thus the concept of an
@@ -618,10 +621,12 @@ class FailMechMdl(MechMdl):
         float
             Always 0
         """
+        if type(deg_val) is np.ndarray:
+            return np.zeros_like(deg_val, dtype=float)
         return 0.0
 
     def calc_deg_vals(
-        self, times: np.ndarray, pre_deg_vals: np.ndarray, strs_conds: dict, latents: dict, dims: tuple,
+        self, times: np.ndarray, pre_deg_vals: np.ndarray, strs_conds: dict, latents: dict, dims: tuple
     ) -> np.ndarray:
         """
         Calculate the failure state for the mechanism given a set of stress conditions and stress duration
@@ -671,7 +676,7 @@ class CondShiftMdl(LatentMdl):
     """
 
     def __init__(
-        self, cond_shift_eqn: Callable = None, mdl_name: str = None, unitary_val: int = 0, **latent_vars: LatentVar,
+        self, cond_shift_eqn: Callable = None, mdl_name: str = None, unitary_val: int = 0, **latent_vars: LatentVar
     ):
         """
         Parameters
@@ -948,7 +953,7 @@ class DegPrmMdl(LatentMdl):
         return new
 
     def calc_equiv_strs_times(
-        self, strs_dims: tuple, mech_deg_vals: dict, strs_conds: dict, init_vals: dict, latents: dict,
+        self, strs_dims: tuple, mech_deg_vals: dict, strs_conds: dict, init_vals: dict, latents: dict
     ) -> dict[str, np.ndarray]:
         """
         This method back-calculates the length of time required to reach the passed output value given the other test
@@ -982,13 +987,11 @@ class DegPrmMdl(LatentMdl):
                 'latents': latents[mech],
                 'dims': strs_dims,
             }
-            # Currently we always loop compute because the numerical method used to calculate equivalent stress time
-            # from the SciPy library is not array computable
-            equiv_times[mech] = _loop_compute(self.mech_mdl(mech).calc_equiv_strs_time, args_dict, strs_dims)
+            equiv_times[mech] = self.mech_mdl(mech).calc_equiv_strs_time(**args_dict)
         return equiv_times
 
     def calc_deg_vals(
-        self, strs_dims: tuple, times: dict, strs_conds: dict, init_vals: np.ndarray, latents: dict, deg_vals: dict,
+        self, strs_dims: tuple, times: dict, strs_conds: dict, init_vals: np.ndarray, latents: dict, deg_vals: dict
     ) -> (np.ndarray, dict):
         """
         Calculate the underlying degraded values for the parameter given a set of stress conditions and stress duration.
@@ -1023,7 +1026,7 @@ class DegPrmMdl(LatentMdl):
         mech_vals = {}
         for mech in self.mech_mdl_list:
             mech_vals[mech] = self.mech_mdl(mech).calc_deg_vals(
-                times[mech], deg_vals[mech], strs_conds, latents[mech], strs_dims,
+                times[mech], deg_vals[mech], strs_conds, latents[mech], strs_dims
             )
             # Also copy the mechanism degraded vals into the arguments data structure for computing the parameters
             arg_vals[mech] = mech_vals[mech]
@@ -1041,7 +1044,7 @@ class DegPrmMdl(LatentMdl):
         return prm_vals, mech_vals
 
     def calc_cond_shifted_vals(
-        self, meas_dims: tuple, strs_conds: dict, deg_vals: np.ndarray, latents: dict,
+        self, meas_dims: tuple, strs_conds: dict, deg_vals: np.ndarray, latents: dict
     ) -> np.ndarray:
         """
         Calculation of the degraded value adjusted according to the conditional shift model

@@ -42,7 +42,7 @@ simulate - The main procedure for the module, uses the above three models to run
 """
 
 # This value determines the project version for PyPi as well
-__version__ = '0.1.5'
+__version__ = '0.2.0'
 
 from . import models
 from . import cookbook
