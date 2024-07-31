@@ -68,7 +68,7 @@ def oxide_failed(
 ):
     # We physically model a transistor oxide layer with 12 possible defect locations
     layout = np.array(
-        [defect0, defect1, defect2, defect3, defect4, defect5, defect6, defect7, defect8, defect9, defect10, defect11],
+        [defect0, defect1, defect2, defect3, defect4, defect5, defect6, defect7, defect8, defect9, defect10, defect11]
     ).reshape((3, 4))
     # Determine defects formed based on whether the stochastic defect formation value has hit a threshold
     oxide = pd.DataFrame(layout).map(lambda deg: 1 if deg > threshold else 0)
@@ -117,7 +117,7 @@ def single_test(step_val, test):
             compute_eqn=oxide_failed,
             array_computable=False,
             threshold=LatentVar(deter_val=0.5),
-        ),
+        )
     )
 
     return gerabaldi.simulate(test, tddb_model, field_env)
@@ -145,7 +145,7 @@ def run_simulation(save_files: dict = None):
         real-world use scenario for a consumer device with downtime and higher stress periods.',
     )
     field_use_sim.append_steps(
-        [weekly_moderate_use, weekly_intensive_use, weekly_idle_use, check_for_fails], TEST_LEN, 'h',
+        [weekly_moderate_use, weekly_intensive_use, weekly_idle_use, check_for_fails], TEST_LEN, 'h'
     )
 
     ########################################################################
@@ -244,7 +244,8 @@ def visualize(rprts):
 @click.command
 @click.option('--data-dir', default=None, help='Use existing simulated data from a JSON file.')
 @click.option('--save-data', is_flag=True, default=False, help='If provided, simulated data will be saved to a JSON.')
-def entry(data_dir, save_data):
+@click.option('--test', is_flag=True, default=False, help='No plotting will occur, an output code is generated.')
+def entry(data_dir, save_data, test):
     if data_dir is not None:
         rprts = {SimReport(file=f'{data_dir}/{DATA_FILES[test]}.json') for test in DATA_FILES}
     else:
@@ -254,7 +255,16 @@ def entry(data_dir, save_data):
             else None
         )
         rprts = run_simulation(save_files=data_files)
-    visualize(rprts)
+    if test:
+        checks = [
+            len(rprts[1.15].measurements.index) == 10500,
+            rprts[1.075].test_summary.at[339, 'v_g'] == 0.87,
+            rprts[1.05].test_summary.at[31, 'duration'].total_seconds() / 3600 == 122,
+            rprts[1.1].dev_counts['tddb'] == 100,
+        ]
+        sys.exit(0 if all(checks) else 1)
+    else:
+        visualize(rprts)
 
 
 if __name__ == '__main__':

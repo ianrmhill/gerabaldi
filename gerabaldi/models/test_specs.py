@@ -57,9 +57,7 @@ class StrsSpec:
         Optional descriptive name for the stress specification
     """
 
-    def __init__(
-        self, conditions: dict, duration: timedelta | float, name: str = 'unspecified', time_unit: str = None,
-    ):
+    def __init__(self, conditions: dict, duration: timedelta | float, name: str = 'unspecified', time_unit: str = None):
         """
         Parameters
         ----------
@@ -142,10 +140,7 @@ class TestSpec:
         self.name = name
 
     def append_steps(
-        self,
-        steps: MeasSpec | StrsSpec | list,
-        loop_for_duration: timedelta | float = None,
-        time_unit: str = None,
+        self, steps: MeasSpec | StrsSpec | list, loop_for_duration: timedelta | float = None, time_unit: str = None
     ):
         """
         Append one or more test instruction steps to the end of the existing list of test steps
@@ -181,7 +176,7 @@ class TestSpec:
             # Ensure steps to add are not purely measurement steps, as that would result in infinite steps being added
             if type(steps) is MeasSpec or (type(steps) is list and all(type(step) is MeasSpec for step in steps)):
                 raise UserConfigError(
-                    'Cannot add steps to test in a loop if no stress phase present, infinite test steps will result.',
+                    'Cannot add steps to test in a loop if no stress phase present, infinite test steps will result.'
                 )
 
             # Loop, appending the set of steps until the stress duration sums to greater than the total requested
@@ -203,7 +198,7 @@ class TestSpec:
             if not (t / duration).is_integer():
                 raise UserWarning(
                     'Appended steps did not result in an integer multiple of the loop duration, test '
-                    'may be longer than intended.',
+                    'may be longer than intended.'
                 )
 
     def calc_samples_needed(self):

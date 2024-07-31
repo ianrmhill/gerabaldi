@@ -10,8 +10,8 @@ from gerabaldi.helpers import logger
 
 # Our default machine precision / machine epsilon is based on a 64-bit computer IEEE floating point representation,
 # it is recommended to increase this value for lower precision hardware
-MACH_32BIT_EPS = 2 ** -24
-MACH_64BIT_EPS = 2 ** -53
+MACH_32BIT_EPS = 2**-24
+MACH_64BIT_EPS = 2**-53
 
 # These values are used when segmenting golden search intervals to maximize rate of convergence
 # GF1 is approximately 0.618, GF2 is approximately 0.382 (i.e., 1 - GF1)
@@ -29,19 +29,25 @@ def minimize(func, extra_args: dict, bounds, precision=1e-5, mach_eps=MACH_64BIT
     # We divide by three so that abs_tol directly represents the furthest that the estimated minimum can be from the
     # true minimum
     abs_tol = precision / 3.0
-    rel_tol = mach_eps ** 0.5
+    rel_tol = mach_eps**0.5
     # Initialize the bounds a and b within which to find the function minimum, shape determined by first function arg
     shape_to_match = f_args[0]
-    a = np.full_like(shape_to_match, np.log10(bounds[0]), dtype=float) if log_gold \
+    a = (
+        np.full_like(shape_to_match, np.log10(bounds[0]), dtype=float)
+        if log_gold
         else np.full_like(shape_to_match, bounds[0], dtype=float)
-    b = np.full_like(shape_to_match, np.log10(bounds[1]), dtype=float) if log_gold \
+    )
+    b = (
+        np.full_like(shape_to_match, np.log10(bounds[1]), dtype=float)
+        if log_gold
         else np.full_like(shape_to_match, bounds[1], dtype=float)
+    )
     # Initialize the parabolic interpolation points
     v = w = x = a + (GF2 * (b - a))
     as_kwargs = {}
     for i, arg in enumerate(f_args_order):
         as_kwargs[arg] = f_args[i]
-    fv = fw = fx = func(10 ** x, **as_kwargs) if log_gold else func(x, **as_kwargs)
+    fv = fw = fx = func(10**x, **as_kwargs) if log_gold else func(x, **as_kwargs)
     # 'e' represents the step size between the old and new minimum estimate from two iterations ago. This bookkeeping
     # is used to force golden section searches if parabolic interpolation is not proceeding faster than a bisection
     # search method. Not strictly necessary for guaranteed convergence, but adds a guarantee that the algorithm is never
@@ -79,8 +85,9 @@ def minimize(func, extra_args: dict, bounds, precision=1e-5, mach_eps=MACH_64BIT
             step = np.where(use_para, p / q, GF2 * (further_boundary - x))
         u_tent = x + step
 
-        change_to_gold = use_para & (np.less(b, u_tent) | np.greater(a, u_tent) |
-                                     np.greater(np.abs(step), (0.5 * np.abs(e))))
+        change_to_gold = use_para & (
+            np.less(b, u_tent) | np.greater(a, u_tent) | np.greater(np.abs(step), (0.5 * np.abs(e)))
+        )
         # Determine the golden search step for any problems where parabolic search just failed the final two checks
         step = np.where(change_to_gold, GF2 * (further_boundary - x), step)
         u_tent = np.where(change_to_gold, x + step, u_tent)
@@ -93,7 +100,7 @@ def minimize(func, extra_args: dict, bounds, precision=1e-5, mach_eps=MACH_64BIT
         fn_kwargs = {}
         for i, arg in enumerate(f_args_order):
             fn_kwargs[arg] = f_args[i]
-        fu = func(10 ** u, **fn_kwargs) if log_gold else func(u, **fn_kwargs)
+        fu = func(10**u, **fn_kwargs) if log_gold else func(u, **fn_kwargs)
 
         # Now to update all the variables
         e = d
@@ -103,8 +110,10 @@ def minimize(func, extra_args: dict, bounds, precision=1e-5, mach_eps=MACH_64BIT
         a = np.where(is_less & np.greater_equal(u, x), x, np.where(~is_less & np.less(u, x), u, a))
         b = np.where(is_less & np.less(u, x), x, np.where(~is_less & np.greater_equal(u, x), u, b))
 
-        v_cond_1, v_cond_2 = (is_less | np.less_equal(fu, fw) | np.equal(w, x),
-                              np.less_equal(fu, fv) | np.equal(v, w) | np.equal(v, x))
+        v_cond_1, v_cond_2 = (
+            is_less | np.less_equal(fu, fw) | np.equal(w, x),
+            np.less_equal(fu, fv) | np.equal(v, w) | np.equal(v, x),
+        )
         v, fv = np.where(v_cond_1, w, np.where(v_cond_2, u, v)), np.where(v_cond_1, fw, np.where(v_cond_2, fu, fv))
 
         w_cond = np.less_equal(fu, fw) | np.equal(w, x)
@@ -122,4 +131,4 @@ def minimize(func, extra_args: dict, bounds, precision=1e-5, mach_eps=MACH_64BIT
     if completed_iters == maxiter:
         logger.warn('Equivalent time numerical method hit max iterations, obtained results may have reduced precision.')
     # Return the value of x from the final iteration which is the minimum point found for f
-    return 10 ** x if log_gold else x
+    return 10**x if log_gold else x

@@ -3,7 +3,7 @@ requires = ["setuptools>=66.0"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-packages = ["gerabaldi", "gerabaldi.models", "gerabaldi.cookbook"]
+packages = ["gerabaldi", "gerabaldi.models", "gerabaldi.math", "gerabaldi.cookbook"]
 
 [project]
 name = "gerabaldi"
@@ -37,9 +37,12 @@ testpaths = ["tests"]
 line-length = 120
 lint.select = ["ALL"]
 lint.ignore = ["C90", "D", "I", "ANN", "EM", "PLR", "TCH", "FBT", "PTH", "T20",
-    "ARG001", "ARG002", "F403", "F405", "E741", "RET505", "SIM114", "TRY003", "RUF013"]
+    "ARG001", "ARG002", "F403", "F405", "E741", "PD008", "RET505", "SIM114", "TRY003", "RUF013", "ISC001", "COM812"]
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["S101", "SLF001"]
 "demos/*" = ["INP001"]
 [tool.ruff.lint.flake8-quotes]
 inline-quotes = "single"
+[tool.ruff.format]
+quote-style = "single"
+skip-magic-trailing-comma = true

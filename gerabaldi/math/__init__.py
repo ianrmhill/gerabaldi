@@ -4,3 +4,5 @@
 """Custom algorithms leveraged for the Gerabaldi package."""
 
 from .minimize import minimize
+
+__all__ = ['minimize']

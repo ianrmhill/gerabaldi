@@ -76,7 +76,7 @@ def run_simulation(save_files: dict = None):
         env_vrtns={
             'temp': EnvVrtnMdl(dev_vrtn_mdl=Normal(0, 0.05), chp_vrtn_mdl=Normal(0, 0.2)),
             'vdd': EnvVrtnMdl(dev_vrtn_mdl=Normal(0, 0.0003), chp_vrtn_mdl=Normal(0, 0.0005)),
-        },
+        }
     )
 
     ########################################################################
@@ -113,7 +113,7 @@ def run_simulation(save_files: dict = None):
                         bti_vth_shift_empirical,
                         a_0=LatentVar(Normal(0.006, 0.0005)),
                         e_aa=LatentVar(
-                            Normal(-0.05, 0.0002), chp_vrtn_mdl=Normal(1, 0.0003), lot_vrtn_mdl=Normal(1, 0.0001),
+                            Normal(-0.05, 0.0002), chp_vrtn_mdl=Normal(1, 0.0003), lot_vrtn_mdl=Normal(1, 0.0001)
                         ),
                         alpha=LatentVar(Normal(9.5, 0.002), chp_vrtn_mdl=Normal(1, 0.005)),
                         n=LatentVar(Normal(0.4, 0.0005)),
@@ -133,7 +133,7 @@ def run_simulation(save_files: dict = None):
                         chp_vrtn_mdl=Normal(0, 0.0002),
                         lot_vrtn_mdl=Normal(0, 0.0003),
                         vrtn_type='offset',
-                    ),
+                    )
                 ),
                 compute_eqn=v_th_eqn,
             ),
@@ -267,7 +267,8 @@ def visualize(rprts):
 @click.command
 @click.option('--data-dir', default=None, help='Use existing simulated data from a JSON file.')
 @click.option('--save-data', is_flag=True, default=False, help='If provided, simulated data will be saved to a JSON.')
-def entry(data_dir, save_data):
+@click.option('--test', is_flag=True, default=False, help='No plotting will occur, an output code is generated.')
+def entry(data_dir, save_data, test):
     if data_dir is not None:
         rprts = {SimReport(file=f'{data_dir}/{DATA_FILES[test]}.json') for test in DATA_FILES}
     else:
@@ -277,7 +278,16 @@ def entry(data_dir, save_data):
             else None
         )
         rprts = run_simulation(save_files=data_files)
-    visualize(rprts)
+    if test:
+        checks = [
+            len(rprts['Current Process: LTOL'].measurements.index) == 2625,
+            rprts['New Process: Ramped Cycling'].test_summary.at[29, 'vdd'] == 1.02,
+            rprts['Current Process: HTOL'].test_summary.at[13, 'start time'].total_seconds() / 3600 == 300,
+            rprts['New Process: LTOL'].dev_counts['v_th'] == 5,
+        ]
+        sys.exit(0 if all(checks) else 1)
+    else:
+        visualize(rprts)
 
 
 if __name__ == '__main__':

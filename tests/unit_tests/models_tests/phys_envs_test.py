@@ -57,7 +57,7 @@ def test_env_vrtn_model(sequential_var):
 
     # Test all the variation value generation methods
     mdl = EnvVrtnMdl(
-        dev_vrtn_mdl=sequential_var(0, 0.01), chp_vrtn_mdl=sequential_var(0, 0.1), batch_vrtn_mdl=sequential_var(1, 1),
+        dev_vrtn_mdl=sequential_var(0, 0.01), chp_vrtn_mdl=sequential_var(0, 0.1), batch_vrtn_mdl=sequential_var(1, 1)
     )
     mdl.vrtn_type = 'scaling'
     mdl.dev_vrtn_mdl = Deterministic(3)
@@ -84,7 +84,7 @@ def test_physical_test_environment(sequential_var):
     assert type(env.meas_instm('another_prm')) is MeasInstrument
     assert env.gen_env_cond_vals({'p1': 125, 'prm2': 3.1415}, {'p1': 1, 'prm2': 1})['prm2']['prm2'] == 3.1415
     assert np.allclose(
-        env.gen_env_cond_vals({'p1': 125}, {'p1': 2}, num_chps=2)['p1']['p1'], np.array([[[125, 125], [125, 125]]]),
+        env.gen_env_cond_vals({'p1': 125}, {'p1': 2}, num_chps=2)['p1']['p1'], np.array([[[125, 125], [125, 125]]])
     )
 
     # Now test non-defaults model and instrument use
@@ -124,7 +124,7 @@ def test_physical_test_environment(sequential_var):
         {
             'bti': DegPrmMdl(DegMechMdl(bti_func, mdl_name='deg'), cond_shift_mdl=CondShiftMdl(cond_func)),
             'hci': DegPrmMdl(DegMechMdl(hci_func, mdl_name='deg2')),
-        },
+        }
     )
     test_spec = TestSpec([MeasSpec({'bti': 2, 'hci': 3, 'b': 2}, {'a': 13, 'b': 7})], num_chps=2, num_lots=1)
     report = SimReport(test_spec)

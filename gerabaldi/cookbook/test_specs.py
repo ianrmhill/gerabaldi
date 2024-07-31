@@ -58,7 +58,7 @@ def htol(
     meas_strs = MeasSpec(to_meas, {'temp': strs_temp_c + CELSIUS_TO_KELVIN, 'vdd': strs_vdd}, 'Stress Temp Measurement')
     meas_room = MeasSpec(to_meas, {'temp': room_temp_c + CELSIUS_TO_KELVIN, 'vdd': room_vdd}, 'Room Temp Measurement')
     htol_strs = StrsSpec(
-        {'temp': strs_temp_c + CELSIUS_TO_KELVIN, 'vdd': strs_vdd}, timedelta(hours=htol_duration), 'HTOL Stress',
+        {'temp': strs_temp_c + CELSIUS_TO_KELVIN, 'vdd': strs_vdd}, timedelta(hours=htol_duration), 'HTOL Stress'
     )
     htol_test = TestSpec(
         [meas_room],
@@ -76,7 +76,7 @@ def htol(
             raise UserConfigError(
                 f'The stress measure interval of {strs_meas_intrvl} does not fit into {htol_duration}'
                 'hours a whole number of times. Please use an interval that is a factor of the test'
-                'duration.',
+                'duration.'
             )
         htol_strs.duration = timedelta(hours=strs_meas_intrvl)
         htol_test.append_steps(meas_strs)

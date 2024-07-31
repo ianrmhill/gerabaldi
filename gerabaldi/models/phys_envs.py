@@ -84,7 +84,7 @@ class MeasInstrument:
             # The calculation for determining the sig figs -> decimal places is pretty standard and widely explained
             # Ternary operator is used to handle special cases that cause the rounding to fail otherwise
             meas_vals = meas_vals.apply(
-                lambda x: x if x == 0 or np.isinf(x) else np.round(x, self._precision - int(floor(log10(abs(x)))) - 1),
+                lambda x: x if x == 0 or np.isinf(x) else np.round(x, self._precision - int(floor(log10(abs(x)))) - 1)
             )
         if self._range:
             # If the measured value exceeds the measurement range then force it to the limit
@@ -271,13 +271,11 @@ class EnvVrtnMdl:
         return self._op(
             np.expand_dims(base_vals, axis=-1),
             self.dev_vrtn_mdl.sample(num_devs * base_vals.size).reshape(
-                (base_vals.shape[0], base_vals.shape[1], num_devs),
+                (base_vals.shape[0], base_vals.shape[1], num_devs)
             ),
         )
 
-    def gen_env_vrtns(
-        self, base_val: float, num_devs: int = 1, num_chps: int = 1, num_lots: int = 1,
-    ) -> np.ndarray:
+    def gen_env_vrtns(self, base_val: float, num_devs: int = 1, num_chps: int = 1, num_lots: int = 1) -> np.ndarray:
         """
         Generate stochastic samples of the environmental condition for some number of samples, devices, and lots
 
@@ -433,7 +431,7 @@ class PhysTestEnv:
             if not test_info:
                 raise UserConfigError(
                     'Generating environmental condition values requires device counts to be specified'
-                    'either via the test report or through the "prms" argument.',
+                    'either via the test report or through the "prms" argument.'
                 )
             dev_counts = test_info.dev_counts
 
