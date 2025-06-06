@@ -403,6 +403,28 @@ class MechMdl(LatentMdl):
         """
         return np.full((num_lots, num_chps, num_devs), self.unitary)
 
+    def get_unitary_vals(self, num_devs, num_chps, num_lots):
+        """
+        Initialize a 3D array of unitary values for the initial degradation of the mechanism. This method assumes zero
+        degradation at initial conditions, though initial values can be varied using InitValMdl or by incorporating
+        non-zero initial degradation into the mechanism equation/function itself.
+
+        Parameters
+        ----------
+        num_devs: int
+            Quantity of devices to initialize
+        num_chps: int
+            Quantity of chips to initialize
+        num_lots: int
+            Quantity of lots to initialize
+
+        Returns
+        -------
+        numpy.ndarray
+            A 3D array of unitary values, indexing style lot->chp->dev
+        """
+        return np.full((num_lots, num_chps, num_devs), self.unitary)
+
     def calc_equiv_strs_time(self, deg_val, init_val, strs_conds, latents, dims):
         raise NotImplementedError('Mechanism does not define how to compute value changes under time-varying stress')
 
@@ -441,7 +463,7 @@ class MechMdl(LatentMdl):
         """
         # To support degradation mechanisms that exhibit threshold behaviours, we first identify whether some samples
         # won't degrade under the current stress conditions based on the failure to find a valid equivalent stress time
-        no_deg_mask = np.where(times > 9e9, pre_deg_vals, np.inf)
+        no_deg_mask = np.where(times > 9e7, pre_deg_vals, np.inf)
 
         # Add the stress time to the argument dict
         arg_vals = {'time': times}
@@ -457,6 +479,8 @@ class MechMdl(LatentMdl):
         except ValueError:
             deg_vals = _loop_compute(self.compute, arg_vals, dims)
 
+        # Possible for stochastic stress conditions under equivalent times to result in effective recovery, make sure that doesn't occur
+        deg_vals = np.where(deg_vals > pre_deg_vals, deg_vals, pre_deg_vals)
         # Overwrite the calculated degradation for the samples that we knew wouldn't degrade to the previous values
         # Note that we do a little extra work here as deg_vals is still computed for the non-degrading samples, but this
         # allows for array computation.
@@ -549,7 +573,7 @@ class DegMechMdl(MechMdl):
 
         # Find the time/zero point at which the current degradation is achieved under the new stress conditions
         return minimize(residue, extra_args={'curr_deg_val': deg_val, 'conds': strs_conds, 'ltnts': latents},
-                        bounds=(1e-3, 1e10), maxiter=50, log_gold=True)
+                        bounds=(1e-3, 1e10), maxiter=50, log_gold=True)[0]
 
 
 class FailMechMdl(MechMdl):
@@ -1078,7 +1102,7 @@ class DegPrmMdl(LatentMdl):
         # Now set the initial values to the degraded values since they fill the same role in the parameter compute
         # equation, and set the mechanism degradation models to their unitary values
         for mech in self.mech_mdl_list:
-            arg_vals[mech] = self.mech_mdl(mech).unitary
+            arg_vals[mech] = self.mech_mdl(mech).get_unitary_vals(meas_dims[2], meas_dims[1], meas_dims[0])
 
         # Next are the parameter's own latent values
         for arg in self.compute_args:
@@ -1181,7 +1205,7 @@ class CircPrmMdl(LatentMdl):
             elif arg in degraded_prm_vals:
                 arg_vals[arg] = degraded_prm_vals[arg]
 
-        return self.compute(**arg_vals)[:][:][:num_samples]
+        return self.compute(**arg_vals)[:, :, :num_samples]
 
     def get_required_prms(self, mdl_prm_list):
         """

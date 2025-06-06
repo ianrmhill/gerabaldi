@@ -131,4 +131,4 @@ def minimize(func, extra_args: dict, bounds, precision=1e-5, mach_eps=MACH_64BIT
     if completed_iters == maxiter:
         logger.warn('Equivalent time numerical method hit max iterations, obtained results may have reduced precision.')
     # Return the value of x from the final iteration which is the minimum point found for f
-    return 10**x if log_gold else x
+    return 10**x if log_gold else x, completed_iters
